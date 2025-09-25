@@ -31,10 +31,16 @@ from .views import (
     confirm_order,
 )
 
+from django.http import HttpResponse
+
+def homepage(request):
+    return HttpResponse("Welcome to the Homepage!")
+
 urlpatterns = [
     # -----------------
     # Authentication
     # -----------------
+    path('', homepage, name='homepage'),
     path('api/register/', register_user, name='register_user'),
     path('api/login/', login_user, name='login'),
     path('api/logout/', logout_user, name='logout_user'),
