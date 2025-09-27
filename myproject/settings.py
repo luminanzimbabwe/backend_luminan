@@ -30,7 +30,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='').split(',')
 
 
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='').split(',')
+CORS_ALLOW_ALL_ORIGINS = True
+
 
 
 # Application definition
@@ -104,6 +105,12 @@ LOGGING = {
 }
 
 
+TEXTBEE_API_KEY = config('TEXTBEE_API_KEY')
+
+
+
+
+
 ROOT_URLCONF = 'myproject.urls'
 
 TEMPLATES = [
@@ -113,6 +120,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -120,6 +128,7 @@ TEMPLATES = [
         },
     },
 ]
+
 
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
