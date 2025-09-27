@@ -787,7 +787,7 @@ def assign_driver(request, order_id):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])  # still allowing any, but token check inside
+@permission_classes([AllowAny])  # token checked inside
 def list_user_orders(request):
     print(">>> Request headers:", request.headers)
 
@@ -798,7 +798,6 @@ def list_user_orders(request):
         if not user:
             return Response({"error": "Forbidden: Invalid token"}, status=403)
 
-        # Make sure user has _id
         if "_id" not in user:
             return Response({"error": "User ID not found in token"}, status=400)
 
@@ -807,27 +806,33 @@ def list_user_orders(request):
         # Fetch user orders
         orders_cursor = gas_orders.find({"customer_id": customer_id}).sort("created_at", -1)
         orders = []
+
         for order in orders_cursor:
+            # Fetch assigned driver (if any) to get price_per_kg
+            driver = None
+            assigned_driver_id = order.get("assigned_driver_id")
+            if assigned_driver_id:
+                driver = drivers_collection.find_one({"_id": ObjectId(assigned_driver_id)})
+
+            unit_price = order.get("unit_price") or (driver.get("price_per_kg") if driver else 0)
+
             orders.append({
-    "order_id": str(order["_id"]),
-    "product_id": str(order.get("product_id")) if order.get("product_id") else None,
-    "quantity": order["quantity"],
-    "weight": order.get("weight", 1),  # send weight
-    "driver_surcharge": order.get("driver_surcharge", 0),  # send surcharge
-    "total_price": order.get("total_price", 0),
-    "unit_price": order.get("unit_price") or drivers_collection.get("price_per_kg", 0),
-    "driver_surcharge": order.get("driver_surcharge", 0),
-
-    "order_status": order["order_status"],
-    "delivery_address": order["delivery_address"],
-    "scheduled_time": order.get("scheduled_time"),
-    "payment_method": order["payment_method"],
-    "notes": order.get("notes"),
-    "vendor_id": str(order.get("vendor_id")) if order.get("vendor_id") else None,
-    "assigned_driver_id": str(order.get("assigned_driver_id")) if order.get("assigned_driver_id") else None,
-    "created_at": order["created_at"]
-})
-
+                "order_id": str(order["_id"]),
+                "product_id": str(order.get("product_id")) if order.get("product_id") else None,
+                "quantity": order.get("quantity", 0),
+                "weight": order.get("weight", 1),
+                "driver_surcharge": order.get("driver_surcharge", 0),
+                "total_price": order.get("total_price", 0),
+                "unit_price": unit_price,
+                "order_status": order.get("order_status"),
+                "delivery_address": order.get("delivery_address"),
+                "scheduled_time": order.get("scheduled_time"),
+                "payment_method": order.get("payment_method"),
+                "notes": order.get("notes"),
+                "vendor_id": str(order.get("vendor_id")) if order.get("vendor_id") else None,
+                "assigned_driver_id": str(assigned_driver_id) if assigned_driver_id else None,
+                "created_at": order.get("created_at")
+            })
 
         print(f">>> Fetched {len(orders)} orders for user {user.get('email', user.get('_id'))}")
         return Response({"orders": orders}, status=200)
@@ -835,8 +840,6 @@ def list_user_orders(request):
     except Exception as e:
         print(">>> Exception in list_user_orders:", e)
         return Response({"error": "Failed to fetch orders", "details": str(e)}, status=500)
-
-
 
 
 @api_view(['GET'])
