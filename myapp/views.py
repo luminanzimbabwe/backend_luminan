@@ -1687,6 +1687,8 @@ def driver_assigned_orders(request):
         )
 
 
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_all_drivers(request):
@@ -1697,24 +1699,26 @@ def list_all_drivers(request):
 
         drivers = []
         for d in drivers_list:
-            # Fetch the company info
+            # Fetch company info
             company = companies_collection.find_one({"company_id": d.get("company_id")})
-            company_name = company.get("name", "Unknown Company") if company else "Unknown Company"
+            company_name = company.get("name") if company and company.get("name") else "LUMINAN COMPANY"
 
             drivers.append({
                 "driver_id": str(d["_id"]),
-                "username": d.get("username", "N/A"),
+                "username": d.get("username") or "N/A",
                 "company": {
                     "company_name": company_name
                 },
-                "phone": d.get("phone", "N/A"),  # ✅ show driver’s phone
-                "price_per_kg": d.get("price_per_kg", 0),
-                "price_per_km": d.get("price_per_km", 0),
-                "rating": d.get("rating", 0),
-                "reviews_count": d.get("reviews_count", 0),
-                "completed_deliveries": d.get("completed_deliveries", 0),
-                "operation_area": d.get("operation_area", "N/A"),  # ✅ show operation area
-                "vehicle_type": d.get("vehicle_type", "N/A")
+                "phone": d.get("phone") or "Not provided",
+                "price_per_kg": d.get("price_per_kg") if d.get("price_per_kg") is not None else 0,
+                "price_per_km": d.get("price_per_km") if d.get("price_per_km") is not None else 0,
+                "rating": d.get("rating") if d.get("rating") is not None else 0,
+                "reviews_count": d.get("reviews_count") if d.get("reviews_count") is not None else 0,
+                "completed_deliveries": d.get("completed_deliveries") if d.get("completed_deliveries") is not None else 0,
+                # ✅ Use the correct DB field name
+                "operational_area": d.get("operational_area") or "Not specified",
+                "vehicle_type": d.get("vehicle_type") or "Not specified",
+                "status": d.get("status") or "Unknown"
             })
 
         return Response({"drivers": drivers}, status=200)
