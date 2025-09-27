@@ -1613,7 +1613,6 @@ def mark_delivered(request, order_id):
 
 # ---------------- GET ENDPOINT ----------------
 
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def driver_assigned_orders(request):
@@ -1646,10 +1645,17 @@ def driver_assigned_orders(request):
                 "driver_surcharge": driver_surcharge,
             }]
 
-            # Customer info
-            customer_name = order.get("customer_name") or "N/A"
+            # Fetch customer info from users collection
+            customer_id = order.get("customer_id")
+            customer_name = "N/A"
+            customer_email = "N/A"
             customer_phone = order.get("customer_phone") or "N/A"
-            customer_email = order.get("customer_email") or "N/A"
+
+            if customer_id:
+                customer_doc = users_collection.find_one({"_id": ObjectId(customer_id)})
+                if customer_doc:
+                    customer_name = customer_doc.get("username", "N/A")
+                    customer_email = customer_doc.get("email", "N/A")
 
             orders.append({
                 "order_id": str(order.get("_id")),
@@ -1679,8 +1685,6 @@ def driver_assigned_orders(request):
             {"error": "Failed to fetch driver orders", "details": str(e)},
             status=500
         )
-
-
 
 
 @api_view(['GET'])
