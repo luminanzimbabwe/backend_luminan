@@ -77,6 +77,60 @@ def get_user_from_token(token):
 
 
 
+# myapp/views.py
+from django.http import JsonResponse
+from .utils import send_sms
+
+# myapp/views.py
+from django.http import JsonResponse
+from django.conf import settings
+import requests
+
+
+# myapp/views.py
+from django.http import JsonResponse
+from django.conf import settings
+import requests
+
+def send_test_sms(request):
+    """
+    Send a test SMS via TextBee to +263787592481
+    """
+    BASE_URL = "https://api.textbee.dev/api/v1"
+    DEVICE_ID = "YOUR_DEVICE_ID"  # Replace with your actual device ID
+    API_KEY = settings.TEXTBEE_API_KEY
+
+    url = f"{BASE_URL}/gateway/devices/{DEVICE_ID}/send-sms"
+
+    payload = {
+        "recipients": ["+263787592481"],  # test number
+        "message": "Hello! This is a test message from LuminaN app."
+    }
+
+    headers = {
+        "x-api-key": API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        return JsonResponse({
+            "success": True,
+            "message": "SMS sent successfully",
+            "response": response.json()
+        })
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({
+            "success": False,
+            "error": f"HTTP Error: {str(e)}"
+        }, status=500)
+
+
+
+
+
+
 
 
 @api_view(['POST'])

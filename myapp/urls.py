@@ -29,6 +29,7 @@ from .views import (
     list_all_drivers,
     mark_delivered,
     confirm_order,
+    send_test_sms,
 )
 
 from django.http import HttpResponse
@@ -40,6 +41,8 @@ urlpatterns = [
     # -----------------
     # Authentication
     # -----------------
+    path('send-sms/', send_test_sms, name='send_test_sms'),
+
     path('', homepage, name='homepage'),
     path('api/register/', register_user, name='register_user'),
     path('api/login/', login_user, name='login'),
