@@ -25,7 +25,7 @@ from uuid import uuid4
 from decouple import config
 import jwt
 from rest_framework.authentication import SessionAuthentication
-
+from .utils import send_sms
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -34,6 +34,7 @@ from bson import ObjectId
 from datetime import datetime
 import bcrypt
 import secrets
+import requests
 
 
 # Access the users collection
@@ -61,7 +62,7 @@ MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_TIME_MINUTES = 15
 JWT_SECRET = config("SECRET_KEY")
 JWT_ALGORITHM = "HS256"
-JWT_EXP_DELTA_SECONDS = 60 * 60 * 24  # 1 day, for example
+JWT_EXP_DELTA_SECONDS = 60 * 60 * 24  # 1 day
 JWT_EXP_DELTA_MINUTES = 60 * 60 * 24
 
 
@@ -77,33 +78,19 @@ def get_user_from_token(token):
 
 
 
-# myapp/views.py
-from django.http import JsonResponse
-from .utils import send_sms
-
-# myapp/views.py
-from django.http import JsonResponse
-from django.conf import settings
-import requests
-
-
-# myapp/views.py
-from django.http import JsonResponse
-from django.conf import settings
-import requests
 
 def send_test_sms(request):
     """
     Send a test SMS via TextBee to +263787592481
     """
     BASE_URL = "https://api.textbee.dev/api/v1"
-    DEVICE_ID = "YOUR_DEVICE_ID"  # Replace with your actual device ID
+    DEVICE_ID = "YOUR_DEVICE_ID"  
     API_KEY = settings.TEXTBEE_API_KEY
 
     url = f"{BASE_URL}/gateway/devices/{DEVICE_ID}/send-sms"
 
     payload = {
-        "recipients": ["+263787592481"],  # test number
+        "recipients": ["+263787592481"],  
         "message": "Hello! This is a test message from LuminaN app."
     }
 
@@ -169,7 +156,7 @@ def register_user(request):
 
         # Return single user object
         user_doc["_id"] = str(inserted_id)
-        user_doc.pop("password")  # optional: don’t return hashed password
+        user_doc.pop("password")  
 
         return Response({"user": user_doc}, status=201)
 
@@ -250,7 +237,7 @@ def login_user(request):
             "phone_number": user.get("phone_number"),
             "role": user.get("role", "user"),
             "auth_token": auth_token,
-            "verified": user.get("verified", True)  # if you removed verification, default True
+            "verified": user.get("verified", True)  
         }
 
         return Response({"user": user_resp}, status=200)
@@ -378,7 +365,7 @@ def get_profile(request):
         if not token:
             return Response({"error": "Forbidden: No token provided"}, status=403)
 
-        # Remove "Bearer " prefix if included
+      
         if token.startswith("Bearer "):
             token = token[7:]
 
@@ -386,7 +373,7 @@ def get_profile(request):
         if not user:
             return Response({"error": "Forbidden: Invalid or expired token"}, status=403)
 
-        # Return only relevant fields to avoid sending sensitive data
+        
         profile_data = {
             "id": str(user["_id"]),
             "username": user.get("username"),
@@ -466,6 +453,9 @@ def forgot_password(request):
     except Exception as e:
         return Response({"error": "Failed to process password reset", "details": str(e)}, status=500)
 
+
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def reset_password(request):
@@ -519,13 +509,12 @@ def reset_password(request):
 
 
 
-# -------------------------
-# Logout endpoint
 
 
 # -------------------------
 # Logout endpoint
 # -------------------------
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def logout_user(request):
@@ -533,7 +522,7 @@ def logout_user(request):
     if not token or not get_user_from_token(token):
         return Response({"error": "Invalid or missing token"}, status=403)
 
-    # For simple token auth, logout is just client-side: remove token from app
+    # For simple token auth, logout is just client-side: i have to remove from app only 
     return Response({"message": "Logged out successfully."}, status=200)
 
 
@@ -558,8 +547,13 @@ def delete_account(request):
     except Exception as e:
         return Response({"error": "Account deletion failed", "details": str(e)}, status=500)
 
-#.......logic gas orders 
-
+#--------------------------------------
+#-----------------------------------
+#----------------------------------------------
+#.......LOGIC GAS ORDER..........
+#----------------------------------------------------
+#-----------------------------------------------------------------
+#----------------------------------------------------------------------------------
 
 
 def is_valid_objectid(id_str):
@@ -647,8 +641,8 @@ def create_gas_order(request):
             "product_id": ObjectId(product_id) if product_id else None,
             "vendor_id": vendor_id,
             "quantity": quantity,
-            "unit_price": None,     # will be set when driver assigned
-            "total_price": 0,       # will be set after driver assignment
+            "unit_price": None,     
+            "total_price": 0,       
             "delivery_type": data.get("delivery_type", "home_delivery"),
             "delivery_address": delivery_address,
             "scheduled_time": data.get("scheduled_time"),
@@ -693,10 +687,7 @@ def create_gas_order(request):
 @api_view(['PATCH'])
 @permission_classes([AllowAny])
 def assign_driver(request, order_id):
-    """
-    Assign a driver to a gas order.
-    Updates unit_price, total_price, and notifies customer and driver.
-    """
+    
     try:
         driver_id = request.data.get("driver_id")
         if not driver_id:
@@ -1499,11 +1490,7 @@ def get_driver_from_token(request):
 
 
 
-from bson import ObjectId
-from datetime import datetime
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
+
 
 def safe_datetime(dt):
     if not dt:
