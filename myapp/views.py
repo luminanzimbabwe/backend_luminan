@@ -73,8 +73,8 @@ from paynow import Paynow
 paynow = Paynow(
     '22231',  # Your Integration ID
     '191b4024-b653-42d9-9199-3b20fa5c894c',  # Integration Key
-    'http://localhost:8000/paynow/update',  # Poll URL for Paynow status updates
-    'http://localhost:8000/return?gateway=paynow'  # Return URL after payment
+    'https://backend-luminan.onrender.com/paynow/update',  # Poll URL for Paynow status updates
+    'https://backend-luminan.onrender.com/return?gateway=paynow'  # Return URL after payment
 )
 
 from rest_framework.decorators import api_view, permission_classes
@@ -1374,8 +1374,8 @@ from paynow import Paynow
 paynow = Paynow(
     '22231',
     '191b4024-b653-42d9-9199-3b20fa5c894c',
-    'http://localhost:8000/paynow/update',
-    'http://localhost:8000/return?gateway=paynow'
+    'https://backend-luminan.onrender.com/paynow/update',
+    'https://backend-luminan.onrender.com/return?gateway=paynow'
 )
 
 DEFAULT_PRICE_PER_KG = 2.0  # fallback price per kg

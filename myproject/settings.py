@@ -194,6 +194,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8083",
     "http://192.168.137.1:8081",
     "http://192.168.137.1:8083",
+    "https://backend-luminan.onrender.com"
 ]
 
 
