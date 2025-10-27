@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Luminan Gas Delivery!</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom style for elements to create the NEON GLOW effect */
+        .neon-glow-text {
+            /* Text shadow to simulate neon glow */
+            text-shadow: 0 0 7px #38bdf8, 0 0 10px #38bdf8; /* sky-400 glow */
+        }
+        .neon-box-shadow {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.7), 0 0 5px rgba(56, 189, 248, 0.5); /* sky-400 glow */
+        }
+    </style>
+</head>
+<!-- Switched to dark background for high contrast and modern look -->
+<body class="bg-gray-900 p-4 sm:p-8 text-gray-50">
+
+    <!-- Email Container -->
+    <div class="max-w-3xl mx-auto my-6 bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border-t-4 border-sky-600">
+
+        <!-- Header Section (Dark accent with Neon border) -->
+        <div class="bg-gray-900 p-8 text-white text-center rounded-t-xl border-b-2 border-sky-600">
+            <!-- Rocket Icon SVG for energy/delivery - Neon Blue Color -->
+            <svg class="w-16 h-16 mx-auto mb-3 text-sky-400 neon-glow-text" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 10.5V6a2.25 2.25 0 0 0-4.5 0v4.5M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zM12 18v3m0-3V14"></path>
+            </svg>
+            <h1 class="text-4xl font-extrabold tracking-tight text-sky-50">Welcome to Luminan!</h1>
+            <p class="text-xl font-medium mt-1 text-gray-400">Your Account is Live. Let's Get Started!</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="p-6 sm:p-10 text-gray-50">
+            <h2 class="text-2xl font-semibold mb-4 text-sky-400">Hello, <span class="text-sky-200">{{ username | default:"Valued Customer" }}</span>!</h2>
+            
+            <p class="mb-8 leading-relaxed text-gray-300">
+                Congratulations, your account setup is complete! We're excited to partner with you for reliable, fast gas delivery. Here is everything you need to know about starting your service:
+            </p>
+
+            <!-- Getting Started - 3 Step Guide (Post-Verification Focus) -->
+            <h3 class="text-xl font-bold mb-5 border-b border-gray-700 pb-2 text-sky-400">🚀 Your First 3 Steps in the App</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-center">
+                
+                <div class="p-4 bg-gray-900 border-t-4 border-sky-600 rounded-lg shadow-xl hover:shadow-sky-500/30 transition duration-300">
+                    <span class="text-3xl font-bold text-sky-400 block mb-2">1.</span>
+                    <p class="font-bold text-lg mb-1 text-sky-200">Complete Your Profile</p>
+                    <p class="text-sm text-gray-400">Add emergency contact info and set up your preferred payment method (Card/E-Wallet).</p>
+                </div>
+                
+                <div class="p-4 bg-gray-900 border-t-4 border-sky-600 rounded-lg shadow-xl hover:shadow-sky-500/30 transition duration-300">
+                    <span class="text-3xl font-bold text-sky-400 block mb-2">2.</span>
+                    <p class="font-bold text-lg mb-1 text-sky-200">Explore Services</p>
+                    <p class="text-sm text-gray-400">Review our current tariffs, subscription plans, and service options for your region.</p>
+                </div>
+                
+                <div class="p-4 bg-gray-900 border-t-4 border-sky-600 rounded-lg shadow-xl hover:shadow-sky-500/30 transition duration-300">
+                    <span class="text-3xl font-bold text-sky-400 block mb-2">3.</span>
+                    <p class="font-bold text-lg mb-1 text-sky-200">Place Your First Order</p>
+                    <p class="text-sm text-gray-400">Use our seamless scheduling tool to book a delivery time that fits your schedule.</p>
+                </div>
+            </div>
+            
+            <!-- Core Features Section -->
+            <h3 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2 text-sky-400">✨ Luminan Key App Features</h3>
+            <div class="space-y-4 text-gray-300">
+                <div class="flex items-start p-3 bg-gray-900 rounded-lg border border-sky-600/30">
+                    <span class="text-sky-400 text-2xl mr-3 mt-1">📍</span>
+                    <div>
+                        <strong class="text-sky-200">Real-Time Tracking:</strong>
+                        <p class="text-sm">Never guess when your gas will arrive. Watch your driver on a live map within the app.</p>
+                    </div>
+                </div>
+                <div class="flex items-start p-3 bg-gray-900 rounded-lg border border-sky-600/30">
+                    <span class="text-sky-400 text-2xl mr-3 mt-1">🔄</span>
+                    <div>
+                        <strong class="text-sky-200">Auto-Refill & Subscription:</strong>
+                        <p class="text-sm">Set up automated refills based on your historical usage so you never run low unexpectedly.</p>
+                    </div>
+                </div>
+                <div class="flex items-start p-3 bg-gray-900 rounded-lg border border-sky-600/30">
+                    <span class="text-sky-400 text-2xl mr-3 mt-1">📊</span>
+                    <div>
+                        <strong class="text-sky-200">Usage Analytics:</strong>
+                        <p class="text-sm">View detailed monthly reports on your consumption to better manage your budget and energy use.</p>
+                    </div>
+                </div>
+                <div class="flex items-start p-3 bg-gray-900 rounded-lg border border-sky-600/30">
+                    <span class="text-sky-400 text-2xl mr-3 mt-1">💬</span>
+                    <div>
+                        <strong class="text-sky-200">24/7 Priority Support:</strong>
+                        <p class="text-sm">Access instant chat support directly through the app for any questions or emergencies.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strong CTA to Launch App -->
+            <div class="text-center mt-10 p-6 bg-gray-900 rounded-xl border border-sky-600/50 shadow-lg neon-box-shadow">
+                <p class="text-lg font-semibold text-sky-200 mb-5">Ready to place your first order?</p>
+                <a href="{{ app_launch_url | default:'#' }}" class="inline-block px-10 py-3 bg-sky-600 text-white font-black rounded-full text-lg shadow-xl hover:bg-sky-400 transition duration-300 transform hover:scale-105 border-b-4 border-sky-800">
+                    Launch the Luminan App Now
+                </a>
+            </div>
+            
+            <!-- Additional Info Section -->
+            <div class="mt-8 pt-6 border-t border-gray-700">
+                <h3 class="text-xl font-bold text-gray-200 mb-4 flex items-center">
+                    <span class="mr-2 text-sky-400">💡</span> Our Commitment
+                </h3>
+                <p class="text-sm text-gray-400 mb-4">
+                    Luminan's mission is simple: provide safe, reliable, and convenient energy delivery using cutting-edge technology. We are committed to minimizing your environmental footprint while maximizing your convenience.
+                </p>
+                <div class="text-center">
+                    <p class="mt-5 text-base text-gray-300">Download the Mobile App for the best experience:</p>
+                    <div class="flex justify-center space-x-4 mt-3">
+                        <a href="{{ app_store_link | default:'#' }}" class="text-sm text-sky-400 hover:text-sky-200 transition">Apple App Store</a>
+                        <span class="text-gray-600">|</span>
+                        <a href="{{ play_store_link | default:'#' }}" class="text-sm text-sky-400 hover:text-sky-200 transition">Google Play Store</a>
+                    </div>
+                </div>
+            </div>
+
+            <p class="mt-10 text-base text-gray-300">We appreciate your trust!</p>
+            <p class="font-extrabold text-xl text-sky-400">— The Luminan Technologies Team</p>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-6 text-center text-xs text-gray-400 border-t border-gray-700 bg-gray-900">
+            <p class="mb-1">For immediate assistance, visit our <a href="{{ support_url | default:'#' }}" class="text-sky-400 hover:underline font-medium">Luminan Help Center</a>.</p>
+            <p>&copy; {{ current_year | default:"2025" }} Luminan Technologies. All rights reserved. | <a href="{{ privacy_url | default:'#' }}" class="text-sky-400 hover:underline">Privacy Policy</a></p>
+        </div>
+    </div>
+</body>
+</html>

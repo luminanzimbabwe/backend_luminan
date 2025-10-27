@@ -11,6 +11,18 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 from decouple import config
 from pathlib import Path
+from datetime import timedelta
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+
+
+
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -24,10 +36,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # DEBUG mode from .env
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = True
 
 # Allowed hosts from .env
-ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='').split(',')
+ALLOWED_HOSTS = ['*']
+
+
 
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -45,13 +59,32 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     
-    # Third-party apps
-    'rest_framework',  # Only if you plan to build REST APIs
 
-    # Your apps
-    'myapp',           # Replace with your actual app name
-    'channels',
+    'rest_framework',  
+
+    
+    'myapp',           
+    "channels",
 ]
+
+
+# SECURITY WARNING: Keep the email/password separate from the code!
+EMAIL_BACKEND = 'myapp.email_utils.CustomEmailBackend' 
+EMAIL_HOST = config('EMAIL_HOST')
+EMAIL_PORT = config('EMAIL_PORT', cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+
+# This is the email address that will appear in the "From" field.
+# Make sure your Gmail account allows sending from this address if different from EMAIL_HOST_USER.
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL') 
+
+
+CHANNEL_LAYERS = {
+    "default": {"BACKEND": "channels_redis.core.RedisChannelLayer",
+                "CONFIG": {"hosts": [("127.0.0.1", 6379)]}}
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -80,6 +113,9 @@ CORS_ALLOW_HEADERS = [
     'accept',
     'Authorization',
     'X-Requested-With',
+    "x-admin-pin",
+    'x-csrftoken',
+
 ]
 
 
@@ -108,7 +144,22 @@ LOGGING = {
 TEXTBEE_API_KEY = config('TEXTBEE_API_KEY')
 
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        # Use the custom authentication that understands the app's HS256 tokens
+        'myapp.authentication.MongoJWTAuthentication',
+    ),
+}
 
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),       
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),         
+}
+
+# If set to True, generated JWTs will omit the 'exp' claim and therefore
+# won't expire. Dangerous for production — prefer rotating refresh tokens.
+TOKEN_NEVER_EXPIRE = config('TOKEN_NEVER_EXPIRE', default=False, cast=bool)
 
 
 ROOT_URLCONF = 'myproject.urls'
@@ -131,6 +182,24 @@ TEMPLATES = [
 
 
 WSGI_APPLICATION = 'myproject.wsgi.application'
+ASGI_APPLICATION = 'myproject.asgi.application'
+
+
+ADMIN_SECRET_PIN = "26344"
+
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8083",
+    "http://127.0.0.1:8083",
+    "http://192.168.137.1:8081",
+    "http://192.168.137.1:8083",
+]
+
+
+# Optional: if using AJAX, ensure CSRF cookie is set
+CSRF_COOKIE_HTTPONLY = False  # JS can read cookie
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 
 # Database

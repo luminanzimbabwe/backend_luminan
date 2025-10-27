@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Sign-In Detected</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font import and utility override */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-8">
+
+    <!-- Email Container -->
+    <div class="max-w-2xl mx-auto my-4 bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-200">
+
+        <!-- Header Section -->
+        <div class="bg-indigo-700 p-6 text-white text-center rounded-t-xl">
+            <!-- Brand Icon/Logo Placeholder -->
+            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-5.618 4.016M12 21a9 9 0 100-18 9 9 0 000 18z"></path>
+            </svg>
+            <h1 class="text-2xl font-bold tracking-tight">GasLT Security Alert</h1>
+        </div>
+
+        <!-- Content Section -->
+        <div class="p-6 sm:p-10 text-gray-800">
+            <h2 class="text-3xl font-extrabold mb-6 text-indigo-700">New Login Detected 🔔</h2>
+            
+            <p class="mb-4 text-lg">Hi <strong class="text-indigo-600">{{ username | default:"User" }}</strong>,</p>
+            
+            <p class="mb-6">We detected a successful sign-in to your **GasLT Gas Delivery** account just now. We provide this notification to help keep your account secure.</p>
+            
+            <!-- Details Box (Enhanced Visuals with Icons) -->
+            <div class="bg-indigo-50 p-6 rounded-xl border-l-4 border-indigo-500 shadow-inner mb-6">
+                <p class="text-sm font-semibold mb-3 uppercase text-indigo-600 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Activity Snapshot
+                </p>
+                
+                <div class="space-y-3 text-sm">
+                    <!-- Time -->
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="font-medium w-20 text-gray-600">Time:</span>
+                        <span class="font-semibold">{{ login_time | default:"Oct 15, 2025 10:30 AM CAT" }}</span>
+                    </div>
+                    <!-- User/Email -->
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        <span class="font-medium w-20 text-gray-600">User:</span>
+                        <span class="font-semibold truncate">{{ identifier | default:"user@example.com" }}</span>
+                    </div>
+                    <!-- Device -->
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-4-4m5-6h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="font-medium w-20 text-gray-600">Device:</span>
+                        <span class="font-semibold">{{ device_info | default:"Windows 11 / Chrome" }}</span>
+                    </div>
+                    <!-- Location -->
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.727A8 8 0 016.343 5.273L4.343 3.273m1.414 11.314a1.5 1.5 0 11-2.122 2.122 1.5 1.5 0 012.122-2.122zM12 21.001V21h-2a1 1 0 01-1-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1zM7 10h10a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2a1 1 0 011-1z"></path></svg>
+                        <span class="font-medium w-20 text-gray-600">Location:</span>
+                        <span class="font-semibold">{{ ip_address | default:"Harare, Zimbabwe / 192.0.2.1" }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Security Action/Warning -->
+            <p class="mb-8 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg">
+                <strong class="font-extrabold">🚨 Unauthorized Access?</strong> If this login was **NOT** performed by you, please click the button below immediately to lock your account and reset your password.
+            </p>
+
+            <!-- Primary Call to Action -->
+            <div class="security-action text-center mb-6">
+                <a href="{{ reset_password_url | default:"#" }}" class="inline-block w-full sm:w-auto px-8 py-3 bg-red-600 text-white text-lg font-bold rounded-lg shadow-xl hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-[1.02]">
+                    Secure My Account Now
+                </a>
+            </div>
+
+            <!-- Secondary Actions -->
+            <p class="mt-8 pt-4 border-t border-gray-200 text-sm text-gray-600">
+                <strong class="font-bold">If this was you:</strong> You can safely ignore this email. For extra peace of mind, you may want to review your current active sessions.
+            </p>
+            <div class="mt-3 text-center">
+                <a href="{{ manage_sessions_url | default:"#" }}" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm underline transition duration-150">
+                    Review and Manage All Devices
+                </a>
+            </div>
+
+            <!-- Proactive Security Checklist -->
+            <div class="mt-10 p-6 bg-yellow-50 rounded-xl border-l-4 border-yellow-400">
+                <h3 class="text-xl font-bold text-yellow-700 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Quick Security Checklist
+                </h3>
+                <ul class="list-none space-y-2 text-sm text-gray-700 ml-0 pl-0">
+                    <li class="flex items-start">
+                        <span class="text-green-500 mr-2 text-lg">✓</span>
+                        <span class="flex-1">Never share your password with anyone, even if they claim to be from Luminan support.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-green-500 mr-2 text-lg">✓</span>
+                        <span class="flex-1">Ensure **Two-Factor Authentication (2FA)** is enabled for all your Luminan accounts.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-green-500 mr-2 text-lg">✓</span>
+                        <span class="flex-1">Only click the "Secure My Account Now" button if you did not recognize the activity.</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <p class="mt-8 text-base text-gray-700">Thank you,<br><strong class="font-semibold">The Luminan Security Team</strong></p>
+        </div>
+        
+        <!-- Footer Section -->
+        <div class="p-6 text-center text-xs text-gray-500 border-t border-gray-100 bg-gray-50">
+            <p class="mb-1 text-gray-700 font-medium">Notification ID: <span class="font-mono text-xs bg-gray-200 p-1 rounded-sm">{{ notification_id | default:"LNA-9475-2384" }}</span></p>
+            <p class="mb-1">&copy; {{ current_year | default:"2025" }} Luminan Gas Delivery. All rights reserved.</p>
+            <p class="mt-3 text-gray-400">This is a mandatory security notification. Please do not reply directly to this email, as this inbox is not monitored.</p>
+        </div>
+    </div>
+</body>
+</html>
