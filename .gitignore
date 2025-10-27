@@ -1,0 +1,12 @@
+# Configuration and Environment
+.env
+
+# Python specific files
+*.pyc
+__pycache__/
+
+# macOS files
+.DS_Store
+
+# Temporary/Download files
+Unconfirmed*.crdownload
