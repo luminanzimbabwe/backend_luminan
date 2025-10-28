@@ -2312,22 +2312,17 @@ def generate_otp():
     from random import randint
     return str(randint(100000, 999999))
 
-# Helper: Send verification email
-def dispatch_verification_code(email, otp_code):
+
+def dispatch_verification_code(email, otp):
+    from django.conf import settings
+    from django.core.mail import send_mail
     try:
-        email = email.strip()
-        if not is_valid_email(email):
-            return False
-        msg = EmailMessage(
-            subject="Your Driver Verification Code",
-            body=f"Your OTP code is: {otp_code}",
-            from_email="no-reply@myapp.com",
-            to=[email]
-        )
-        msg.send(fail_silently=False)
+        subject = "Your LuminaN OTP Verification Code"
+        message = f"Hello,\n\nYour OTP code is: {otp}\n\nIt will expire in {OTP_EXPIRY_MINUTES} minutes."
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
         return True
     except Exception as e:
-        print("⚠️ Email sending failed:", e)
+        print(f"❌ Failed to send OTP: {e}")
         return False
 
 
@@ -2348,89 +2343,7 @@ OTP_EXPIRY_MINUTES = 10
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_TIME_MINUTES = 15
 
-# Collections
-# pending_drivers_collection
-# drivers_collection
-# Assumed already defined elsewhere
 
-import secrets
-import re
-import smtplib
-from email.message import EmailMessage
-
-# -------------------------
-# OTP GENERATION
-# -------------------------
-def generate_otp(length=6):
-    """
-    Generate a numeric OTP of given length using a cryptographically secure method.
-    """
-    return ''.join(str(secrets.randbelow(10)) for _ in range(length))
-
-
-# -------------------------
-# EMAIL SENDING LOGIC
-# -------------------------
-def send_email(subject, body, recipient_email, sender_email, sender_password, smtp_server="smtp.gmail.com", smtp_port=587):
-    """
-    Send an email using SMTP.
-    """
-    try:
-        msg = EmailMessage()
-        msg.set_content(body)
-        msg['Subject'] = subject
-        msg['From'] = sender_email
-        msg['To'] = recipient_email
-
-        # Connect and send email
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
-        print(f"✅ Email sent to {recipient_email}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to send email to {recipient_email}: {e}")
-        return False
-
-
-# -------------------------
-# OTP DISPATCH
-# -------------------------
-from django.core.mail import send_mail
-from django.conf import settings
-
-def dispatch_verification_code(email, otp):
-    try:
-        subject = "Your LuminaN OTP Verification Code"
-        message = f"Hello,\n\nYour verification code is: {otp}\n\nIt will expire in {OTP_EXPIRY_MINUTES} minutes."
-        from_email = settings.DEFAULT_FROM_EMAIL
-        recipient_list = [email]
-
-        send_mail(subject, message, from_email, recipient_list, fail_silently=False)
-        print(f"✅ OTP {otp} sent to {email}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to send OTP: {e}")
-        return False
-
-
-
-# -------------------------
-# WELCOME EMAIL
-# -------------------------
-def dispatch_welcome_email(user_email, username):
-    """
-    Send a welcome email after successful registration.
-    """
-    subject = "Welcome to LuminaN Driver Network!"
-    body = f"Hi {username},\n\nWelcome to LuminaN! Your driver account has been successfully verified.\n\nHappy driving!"
-    
-    sender_email = "your_email@example.com"
-    sender_password = "your_email_password"
-
-    return send_email(subject, body, user_email, sender_email, sender_password)
 
 
 # -------------------------
