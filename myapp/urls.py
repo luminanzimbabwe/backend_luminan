@@ -18,7 +18,7 @@ from .views import (
   
      logout_admin, 
     # Utilities
-    send_test_sms, track_order, refresh_token, get_order_status, paynow_update_view, chat_with_gpt,
+    track_order, refresh_token, get_order_status, paynow_update_view
 )
 
 
@@ -40,7 +40,6 @@ urlpatterns = [
     # Homepage / Root
     # -----------------
     path('', homepage, name='homepage'),
-    path('test/sms/', send_test_sms, name='send_test_sms'),
 
 
     # #######################################################################
@@ -285,7 +284,7 @@ path('admin/global-price/update/', views.admin_update_global_price, name='admin-
 
 
 
-#########  gpt $$########
-path('api/v1chat-gpt/', chat_with_gpt, name='chat_gpt'),
+
+
 
 ]

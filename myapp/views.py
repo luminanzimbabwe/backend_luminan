@@ -10,7 +10,9 @@ from django.template.loader import render_to_string
 from django.contrib.auth.models import AnonymousUser
 from django.conf import settings
 import traceback
+import bcrypt
 import os
+import jwt
 from functools import wraps
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -21,115 +23,41 @@ from django.views.decorators.http import require_POST
 from datetime import datetime, timedelta
 from bson import ObjectId
 from decouple import config
-    try:
-        data = request.data
+from django.conf import settings
+from db import (
+    db,
+    global_config,
+    users_collection,
+    drivers_collection,
+    companies_collection,
+    products_collection,
+    gas_orders,
+    pending_users_collection,
+    pending_drivers_collection,
+    notifications,
+    admins_collection,
+    admin_sessions,
+    admin_activity_logs,
+    payouts_collection,
+    inventory_collection,
+    gas_stations_collection,
+    suppliers_collection,
+    stock_alerts_collection,
+    ratings_collection,
+    withdrawal_requests_collection
+)
+import random
+from bcrypt import hashpw, gensalt
 
-        pin = data.get("pin")
-        username = data.get("username")
-        email = data.get("email")
 
-        if not pin:
-            return Response({"error": "PIN is required for driver login."}, status=400)
 
-        # Validate PIN format: 4-6 digits
-        if not re.fullmatch(r"\d{4,6}", str(pin)):
-            return Response({"error": "PIN must be 4-6 digits."}, status=400)
+SECRET_KEY = settings.SECRET_KEY
 
-        # If the client provided an identifier, try to reuse an existing driver doc
-        driver = None
-        if username or email:
-            query = {}
-            if username:
-                query = {"username": username}
-            elif email:
-                query = {"email": email}
 
-            # Look in active drivers first
-            driver = drivers_collection.find_one(query)
-            # If not found, look in pending drivers
-            if not driver:
-                try:
-                    driver = pending_drivers_collection.find_one(query)
-                except NameError:
-                    # pending_drivers_collection may not exist; ignore
-                    driver = None
+# URL users will visit to reset their password
+RESET_PASSWORD_URL = "https://backend-luminan.onrender.com/reset-password"
 
-        # If found, verify PIN (or set it if missing)
-        if driver:
-            stored_pin_hash = driver.get("pin_hash") or driver.get("pin")
-            # Support both raw fields or hashed values
-            if stored_pin_hash:
-                try:
-                    if isinstance(stored_pin_hash, str):
-                        stored_pin_hash_bytes = stored_pin_hash.encode('utf-8')
-                    else:
-                        stored_pin_hash_bytes = stored_pin_hash
-                    if not checkpw(str(pin).encode('utf-8'), stored_pin_hash_bytes):
-                        return Response({"error": "Invalid PIN."}, status=401)
-                except Exception:
-                    return Response({"error": "Invalid PIN verification."}, status=401)
 
-            else:
-                # No PIN set on existing driver - set it now
-                hashed_pin = bcrypt.hashpw(str(pin).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                drivers_collection.update_one({"_id": driver["_id"]}, {"$set": {"pin_hash": hashed_pin, "verified": True}})
-
-            # Successful login: rotate token and update last_login
-            auth_token = secrets.token_hex(32)
-            drivers_collection.update_one({"_id": driver["_id"]}, {"$set": {"auth_token": auth_token, "last_login": datetime.utcnow()}})
-
-            driver_resp = {
-                "id": str(driver["_id"]),
-                "username": driver.get("username", "gasLTdriver"),
-                "role": driver.get("role", "driver"),
-                "auth_token": auth_token,
-                # tracking fields
-                "currentLocation": driver.get("currentLocation", {"lat": 0.0, "lng": 0.0}),
-                "speed": driver.get("speed", 0),
-                "lastUpdate": driver.get("lastUpdate"),
-            }
-
-            return Response({"driver": driver_resp}, status=200)
-
-        # Not found: create ephemeral driver document (new _id) with tracking fields
-        hashed_pin = bcrypt.hashpw(str(pin).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        auth_token = secrets.token_hex(32)
-
-        driver_doc = {
-            "username": username or "gasLTdriver",
-            "email": email,
-            "phone": data.get("phone"),
-            "operational_area": data.get("operational_area"),
-            "pin_hash": hashed_pin,
-            "role": "driver",
-            "auth_token": auth_token,
-            "status": "available",
-            "price_per_kg": None,
-            "created_at": datetime.utcnow(),
-            "verified": True,
-            # Frontend tracking defaults
-            "currentLocation": {"lat": 0.0, "lng": 0.0},
-            "speed": 0,
-            "lastUpdate": None,
-        }
-
-        inserted_id = drivers_collection.insert_one(driver_doc).inserted_id
-
-        driver_resp = {
-            "id": str(inserted_id),
-            "username": driver_doc["username"],
-            "role": driver_doc.get("role", "driver"),
-            "auth_token": auth_token,
-            "currentLocation": driver_doc["currentLocation"],
-            "speed": driver_doc["speed"],
-            "lastUpdate": driver_doc["lastUpdate"],
-        }
-
-        return Response({"driver": driver_resp}, status=200)
-
-    except Exception as e:
-        logger.exception(f"Driver login failed: {e}")
-        return Response({"error": "Login failed", "details": str(e)}, status=500)
 FORGOT_REQUEST_WINDOW_MINUTES = 10 # Time frame for rate limiting
 MAX_FORGOT_REQUESTS = 3            # Max requests allowed within the window
 RESET_CODE_EXPIRY_MINUTES = 15     # How long the 6-digit code is valid
@@ -1321,7 +1249,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 from datetime import datetime
 from bson import ObjectId
 from rest_framework.decorators import api_view, permission_classes
@@ -1338,7 +1265,8 @@ paynow = Paynow(
     'https://backend-luminan.onrender.com/return?gateway=paynow'
 )
 
-DEFAULT_PRICE_PER_KG = 2.0  # fallback price per kg
+# 🔧 Refined price per kg
+DEFAULT_PRICE_PER_KG = 1.80  # fixed fallback price per kg
 
 # ----------------- Helpers -----------------
 def safe_float(value, default=0.0):
@@ -1420,12 +1348,13 @@ def start_gas_order(request):
             weight_value = ''.join(ch for ch in raw_weight if ch.isdigit() or ch == '.')
             weight = safe_float(weight_value, 1)
 
-        # ---------- Total Price (Refined to use global price) ----------
+        # ---------- Total Price (Refined to use 1.80 per kg or global config) ----------
         config = global_config.find_one({"_id": "global_config"})
         if config and "product_prices" in config:
             unit_price = safe_float(config["product_prices"].get(product.get("name")), DEFAULT_PRICE_PER_KG)
         else:
-            unit_price = safe_float(product.get("price_per_kg"), DEFAULT_PRICE_PER_KG)
+            # always fallback to 1.80 per kg
+            unit_price = 1.80
 
         delivery_surcharge = safe_float(data.get("delivery_surcharge", product.get("surcharge", 0)))
         total_price = round(quantity * weight * unit_price + delivery_surcharge, 2)
@@ -1512,7 +1441,6 @@ def start_gas_order(request):
     except Exception as e:
         print("❌ start_gas_order error:", e)
         return Response({"error": str(e)}, status=500)
-
 
 
 
@@ -2352,7 +2280,13 @@ def register_driver(request):
         otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
 
         # --- Send OTP email ---
-        sent = dispatch_verification_code(data["email"], otp_code)
+        
+        sent = dispatch_verification_code(
+    contact_type="email",        # first argument
+    contact_value=data["email"], # second argument
+    code=otp_code                # third argument
+)
+
         if not sent:
             return Response({"error": "Failed to send verification code. Check email configuration."}, status=503)
 
@@ -2561,21 +2495,15 @@ def login_driver(request):
         last_login = datetime.utcnow()
         drivers_collection.update_one({"_id": driver["_id"]}, {"$set": {"last_login": last_login}})
 
-        # Build driver response without auth token
+        # Minimalistic driver response required by the client
         driver_resp = {
             "_id": str(driver["_id"]),
             "username": driver.get("username"),
             "email": driver.get("email"),
-            "phone": driver.get("phone"),
-            "operational_area": driver.get("operational_area"),
-            "drivers_licence_number": driver.get("drivers_licence_number"),
-            "valid_zimbabwe_id": driver.get("valid_zimbabwe_id"),
-            "bio": driver.get("bio"),
-            "vehicle_number": driver.get("vehicle_number"),
-            "vehicle_color": driver.get("vehicle_color"),
-            "role": driver.get("role", "driver"),
-            "is_verified": driver.get("is_verified", False),
-            "last_login": last_login
+            "is_verified": True,
+            "currentLocation": driver.get("currentLocation", {"lat": 0.0, "lng": 0.0}),
+            "speed": driver.get("speed", 0),
+            "lastUpdate": driver.get("lastUpdate"),
         }
 
         return Response({"success": True, "driver": driver_resp}, status=200)

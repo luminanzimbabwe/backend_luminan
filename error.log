@@ -14,7 +14,7 @@ Internal Server Error: /auth/register/
 "POST /auth/register/ HTTP/1.1" 500 94
 Internal Server Error: /authV1/thisismeprivateisaac/register/
 Traceback (most recent call last):
-  File "D:\backend_luminan\venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+  File "D:\_luminan\venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
     response = get_response(request)
   File "D:\backend_luminan\venv\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
     response = wrapped_callback(request, *callback_args, **callback_kwargs)
@@ -4442,3 +4442,47 @@ Internal Server Error: /api/v1/driver/performance/
 "GET /api/v1/driver/performance/?driver_id=690093e1dc0bd9bbf3c3b868 HTTP/1.1" 500 102
 Internal Server Error: /api/v1/user/register/
 "POST /api/v1/user/register/ HTTP/1.1" 500 84
+Internal Server Error: /api/v1/user/login/
+"POST /api/v1/user/login/ HTTP/1.1" 500 47
+Internal Server Error: /api/v1/user/login/
+"POST /api/v1/user/login/ HTTP/1.1" 500 47
+Internal Server Error: /api/v1/user/login/
+"POST /api/v1/user/login/ HTTP/1.1" 500 47
+Internal Server Error: /api/v1/user/login/
+"POST /api/v1/user/login/ HTTP/1.1" 500 47
+Internal Server Error: /api/v1/user/register/
+"POST /api/v1/user/register/ HTTP/1.1" 500 84
+Internal Server Error: /api/v1/user/forgot-password/
+"POST /api/v1/user/forgot-password/ HTTP/1.1" 500 67
+Internal Server Error: /api/v1/user/forgot-password/
+"POST /api/v1/user/forgot-password/ HTTP/1.1" 500 67
+Internal Server Error: /api/v1/driver/register/
+"POST //api/v1/driver/register/ HTTP/1.1" 500 54
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
