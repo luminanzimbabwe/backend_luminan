@@ -55,6 +55,8 @@ if db is not None:
     products_collection = db["products"]
     gas_orders = db["gas_orders"]
     pending_users_collection = db['pending_users'] 
+        # Pending drivers collection for driver verification flow
+        pending_drivers_collection = db['pending_drivers']
     pending_drivers_collection = db['pending_drivers']
     withdrawal_requests_collection = db['withdrawal_requests']
 

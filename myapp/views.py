@@ -21,149 +21,115 @@ from django.views.decorators.http import require_POST
 from datetime import datetime, timedelta
 from bson import ObjectId
 from decouple import config
-import bcrypt
-from bcrypt import hashpw, gensalt, checkpw
-import uuid, random, secrets, requests, pytz, jwt, traceback
-
-from .utils import send_sms
-from db import (
-    users_collection,
-    drivers_collection,
-    companies_collection,
-    products_collection,
-    gas_orders,
-    notifications,
-    admins_collection,
-    admin_activity_logs,
-    admin_sessions,
-    inventory_collection,
-    gas_stations_collection,
-    suppliers_collection,
-    stock_alerts_collection,
-    ratings_collection,
-    payouts_collection,
-    pending_users_collection,
-    pending_drivers_collection,
-    withdrawal_requests_collection,
-    global_config
-
-
-)
-from bson.objectid import ObjectId
-from datetime import datetime
-
-import random
-import string
-from datetime import datetime, timedelta
-import re
-import os
-import jwt
-import traceback
-from datetime import datetime, timedelta
-from bson.objectid import ObjectId
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from django.conf import settings
-from rest_framework_simplejwt.views import TokenRefreshView
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from paynow import Paynow
-
-# Initialize Paynow with localhost URLs for testing
-paynow = Paynow(
-    '22231',  # Your Integration ID
-    '191b4024-b653-42d9-9199-3b20fa5c894c',  # Integration Key
-    'https://backend-luminan.onrender.com/paynow/update',  # Poll URL for Paynow status updates
-    'https://backend-luminan.onrender.com/return?gateway=paynow'  # Return URL after payment
-)
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-import openai
-from django.conf import settings
-
-# Set API key
-openai.api_key = settings.OPENAI_API_KEY
-
-import traceback
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def chat_with_gpt(request):
-    print("OPENAI_API_KEY loaded:", settings.OPENAI_API_KEY is not None)
-
-    user_message = request.data.get("message")
-    if not user_message:
-        return Response({"error": "Message is required"}, status=400)
-
     try:
-        response = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": user_message}],
-            temperature=0.7
-        )
-        reply = response.choices[0].message["content"]
-        return Response({"reply": reply})
+        data = request.data
+
+        pin = data.get("pin")
+        username = data.get("username")
+        email = data.get("email")
+
+        if not pin:
+            return Response({"error": "PIN is required for driver login."}, status=400)
+
+        # Validate PIN format: 4-6 digits
+        if not re.fullmatch(r"\d{4,6}", str(pin)):
+            return Response({"error": "PIN must be 4-6 digits."}, status=400)
+
+        # If the client provided an identifier, try to reuse an existing driver doc
+        driver = None
+        if username or email:
+            query = {}
+            if username:
+                query = {"username": username}
+            elif email:
+                query = {"email": email}
+
+            # Look in active drivers first
+            driver = drivers_collection.find_one(query)
+            # If not found, look in pending drivers
+            if not driver:
+                try:
+                    driver = pending_drivers_collection.find_one(query)
+                except NameError:
+                    # pending_drivers_collection may not exist; ignore
+                    driver = None
+
+        # If found, verify PIN (or set it if missing)
+        if driver:
+            stored_pin_hash = driver.get("pin_hash") or driver.get("pin")
+            # Support both raw fields or hashed values
+            if stored_pin_hash:
+                try:
+                    if isinstance(stored_pin_hash, str):
+                        stored_pin_hash_bytes = stored_pin_hash.encode('utf-8')
+                    else:
+                        stored_pin_hash_bytes = stored_pin_hash
+                    if not checkpw(str(pin).encode('utf-8'), stored_pin_hash_bytes):
+                        return Response({"error": "Invalid PIN."}, status=401)
+                except Exception:
+                    return Response({"error": "Invalid PIN verification."}, status=401)
+
+            else:
+                # No PIN set on existing driver - set it now
+                hashed_pin = bcrypt.hashpw(str(pin).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                drivers_collection.update_one({"_id": driver["_id"]}, {"$set": {"pin_hash": hashed_pin, "verified": True}})
+
+            # Successful login: rotate token and update last_login
+            auth_token = secrets.token_hex(32)
+            drivers_collection.update_one({"_id": driver["_id"]}, {"$set": {"auth_token": auth_token, "last_login": datetime.utcnow()}})
+
+            driver_resp = {
+                "id": str(driver["_id"]),
+                "username": driver.get("username", "gasLTdriver"),
+                "role": driver.get("role", "driver"),
+                "auth_token": auth_token,
+                # tracking fields
+                "currentLocation": driver.get("currentLocation", {"lat": 0.0, "lng": 0.0}),
+                "speed": driver.get("speed", 0),
+                "lastUpdate": driver.get("lastUpdate"),
+            }
+
+            return Response({"driver": driver_resp}, status=200)
+
+        # Not found: create ephemeral driver document (new _id) with tracking fields
+        hashed_pin = bcrypt.hashpw(str(pin).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        auth_token = secrets.token_hex(32)
+
+        driver_doc = {
+            "username": username or "gasLTdriver",
+            "email": email,
+            "phone": data.get("phone"),
+            "operational_area": data.get("operational_area"),
+            "pin_hash": hashed_pin,
+            "role": "driver",
+            "auth_token": auth_token,
+            "status": "available",
+            "price_per_kg": None,
+            "created_at": datetime.utcnow(),
+            "verified": True,
+            # Frontend tracking defaults
+            "currentLocation": {"lat": 0.0, "lng": 0.0},
+            "speed": 0,
+            "lastUpdate": None,
+        }
+
+        inserted_id = drivers_collection.insert_one(driver_doc).inserted_id
+
+        driver_resp = {
+            "id": str(inserted_id),
+            "username": driver_doc["username"],
+            "role": driver_doc.get("role", "driver"),
+            "auth_token": auth_token,
+            "currentLocation": driver_doc["currentLocation"],
+            "speed": driver_doc["speed"],
+            "lastUpdate": driver_doc["lastUpdate"],
+        }
+
+        return Response({"driver": driver_resp}, status=200)
 
     except Exception as e:
-        print("=== ChatGPT API Exception ===")
-        traceback.print_exc()
-        return Response({"error": str(e)}, status=500)
-
-
-
-# Constants (if not already imported from settings)
-MAX_LOGIN_ATTEMPTS = getattr(settings, "MAX_LOGIN_ATTEMPTS", 5)
-LOCKOUT_DURATION_MINUTES = getattr(settings, "LOCKOUT_DURATION_MINUTES", 15)
-RESET_PASSWORD_URL = getattr(settings, "RESET_PASSWORD_URL", "https://yourdomain.com/reset-password")
-
-# JWT config
-SECRET_KEY = getattr(settings, "SECRET_KEY", "gQhJg-wB8q-v0A4LhK5zE_sXz3r-d-l2iGj9mZ8o2Y4_uT7P0fV6cU1yA2eR4t")
-JWT_ALGORITHM = "HS256"
-
-
-OTP_EXPIRY_MINUTES = 5
-
-
-
-
-
-
-
-
-
-
-
-MAX_FAILED_ATTEMPTS = 5 # Used in verify_otp
-
-
-
-
-LOCAL_TZ = pytz.timezone("Africa/Harare")
-now = datetime.now(LOCAL_TZ)
-
-MAX_FAILED_ATTEMPTS = 5
-LOCKOUT_TIME_MINUTES = 15 
-RESET_TOKEN_EXPIRY_HOURS = 10000000000 
-MAX_FORGOT_REQUESTS = 3
-FORGOT_REQUEST_WINDOW_MINUTES = 15
-RESET_CODE_EXPIRY_MINUTES = 15
-
-
-MAX_FAILED_ATTEMPTS = 5
-LOCKOUT_TIME_MINUTES = 15
-JWT_SECRET = config("SECRET_KEY")
-JWT_ALGORITHM = "HS256"
-JWT_EXP_DELTA_SECONDS = 60 * 60 * 24  # 1 day
-JWT_EXP_DELTA_MINUTES = 60 * 60 * 24
-
-# Alias for bcrypt functions
-hashpw = bcrypt.hashpw
-gensalt = bcrypt.gensalt
-checkpw = bcrypt.checkpw
-
-# --- NEW CONSTANTS FOR PASSWORD RESET ---
+        logger.exception(f"Driver login failed: {e}")
+        return Response({"error": "Login failed", "details": str(e)}, status=500)
 FORGOT_REQUEST_WINDOW_MINUTES = 10 # Time frame for rate limiting
 MAX_FORGOT_REQUESTS = 3            # Max requests allowed within the window
 RESET_CODE_EXPIRY_MINUTES = 15     # How long the 6-digit code is valid
@@ -178,53 +144,47 @@ checkpw = bcrypt.checkpw
 def test_view(request):
     return Response({"message": "hello world"})
 
-
-
-def get_user_from_token(token):
-    return users_collection.find_one({"auth_token": token})
-
-
-
-
-def send_test_sms(request):
-    """
-    Send a test SMS via TextBee to +263787592481
-    """
-    BASE_URL = "https://api.textbee.dev/api/v1"
-    DEVICE_ID = "YOUR_DEVICE_ID"  
-    API_KEY = settings.TEXTBEE_API_KEY
-
-    url = f"{BASE_URL}/gateway/devices/{DEVICE_ID}/send-sms"
-
-    payload = {
-        "recipients": ["+263787592481"],  
-        "message": "Hello! This is a test message from LuminaN app."
-    }
-
-    headers = {
-        "x-api-key": API_KEY,
-        "Content-Type": "application/json"
-    }
-
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        return JsonResponse({
-            "success": True,
-            "message": "SMS sent successfully",
-            "response": response.json()
-        })
-    except requests.exceptions.RequestException as e:
-        return JsonResponse({
-            "success": False,
-            "error": f"HTTP Error: {str(e)}"
-        }, status=500)
+        data = request.data
 
+        # Minimalistic PIN-based driver login that creates a new driver document
+        # on each login with the canonical username 'gasLTdriver'. This returns
+        # a unique driver _id and auth_token for each login.
+        pin = data.get("pin")
+        if not pin:
+            return Response({"error": "PIN is required for driver login."}, status=400)
 
+        # Hash and store the pin (each login creates a fresh record)
+        hashed_pin = bcrypt.hashpw(pin.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        auth_token = secrets.token_hex(32)
 
+        driver_doc = {
+            "username": "gasLTdriver",
+            "email": None,
+            "phone": None,
+            "operational_area": None,
+            "pin_hash": hashed_pin,
+            "role": "driver",
+            "auth_token": auth_token,
+            "status": "available",
+            "price_per_kg": None,
+            "created_at": datetime.utcnow(),
+            "verified": True,
+        }
 
+        inserted_id = drivers_collection.insert_one(driver_doc).inserted_id
 
-def generate_otp():
+        driver_resp = {
+            "id": str(inserted_id),
+            "username": driver_doc["username"],
+            "role": driver_doc.get("role", "driver"),
+            "auth_token": auth_token,
+        }
+
+        return Response({"driver": driver_resp}, status=200)
+
+    except Exception as e:
+        return Response({"error": "Login failed", "details": str(e)}, status=500)
     """Generates a secure 6-digit OTP."""
     # Uses random.choices for cryptographically secure random numbers (good practice)
     return ''.join(random.choices(string.digits, k=6))
@@ -2346,17 +2306,7 @@ def generate_otp():
     return str(randint(100000, 999999))
 
 
-def dispatch_verification_code(email, otp):
-    from django.conf import settings
-    from django.core.mail import send_mail
-    try:
-        subject = "Your LuminaN OTP Verification Code"
-        message = f"Hello,\n\nYour OTP code is: {otp}\n\nIt will expire in {OTP_EXPIRY_MINUTES} minutes."
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
-        return True
-    except Exception as e:
-        print(f"❌ Failed to send OTP: {e}")
-        return False
+
 
 
 
@@ -2536,12 +2486,27 @@ def driver_authenticated(view_func):
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.replace("Bearer ", "").strip()
 
+        # Also accept a raw driver id in the Authorization header or X-Driver-Id
         if not token:
-            return Response({"error": "Authorization token required"}, status=401)
+            token = request.headers.get("X-Driver-Id", "").strip()
 
-        driver = drivers_collection.find_one({"auth_token": token})
+        if not token:
+            return Response({"error": "Driver identifier required in Authorization header or X-Driver-Id."}, status=401)
+
+        driver = None
+        # If token looks like an ObjectId, treat it as driver _id
+        try:
+            if ObjectId.is_valid(token):
+                driver = drivers_collection.find_one({"_id": ObjectId(token)})
+        except Exception:
+            driver = None
+
+        # Fallback: treat token as auth_token (legacy)
         if not driver:
-            return Response({"error": "Invalid or expired token"}, status=401)
+            driver = drivers_collection.find_one({"auth_token": token})
+
+        if not driver:
+            return Response({"error": "Invalid or unknown driver identifier."}, status=401)
 
         # Pass the driver object to the view
         return view_func(request, driver=driver, *args, **kwargs)
@@ -2592,15 +2557,11 @@ def login_driver(request):
         if not checkpw(password.encode('utf-8'), stored_password):
             return Response({"error": "Invalid username/email or password"}, status=401)
 
-        # Generate new permanent auth token
-        auth_token = secrets.token_hex(32)
+        # Update last_login only (no auth token)
         last_login = datetime.utcnow()
-        drivers_collection.update_one(
-            {"_id": driver["_id"]},
-            {"$set": {"auth_token": auth_token, "last_login": last_login}}
-        )
+        drivers_collection.update_one({"_id": driver["_id"]}, {"$set": {"last_login": last_login}})
 
-        # Build driver response
+        # Build driver response without auth token
         driver_resp = {
             "_id": str(driver["_id"]),
             "username": driver.get("username"),
@@ -2614,7 +2575,6 @@ def login_driver(request):
             "vehicle_color": driver.get("vehicle_color"),
             "role": driver.get("role", "driver"),
             "is_verified": driver.get("is_verified", False),
-            "auth_token": auth_token,
             "last_login": last_login
         }
 

@@ -4440,3 +4440,5 @@ Internal Server Error: /api/v1/driver/performance/
 "GET /api/v1/driver/performance/?driver_id=690093e1dc0bd9bbf3c3b868 HTTP/1.1" 500 102
 Internal Server Error: /api/v1/driver/performance/
 "GET /api/v1/driver/performance/?driver_id=690093e1dc0bd9bbf3c3b868 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/user/register/
+"POST /api/v1/user/register/ HTTP/1.1" 500 84
