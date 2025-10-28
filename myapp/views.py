@@ -2345,19 +2345,13 @@ def generate_otp():
     from random import randint
     return str(randint(100000, 999999))
 
-# tasks.py
-from celery import shared_task
-from django.core.mail import send_mail
-from django.conf import settings
 
-@shared_task(bind=True)
-def send_verification_email(self, email, otp_code, otp_expiry_minutes):
-    """
-    Sends OTP verification email asynchronously.
-    """
+def dispatch_verification_code(email, otp):
+    from django.conf import settings
+    from django.core.mail import send_mail
     try:
         subject = "Your LuminaN OTP Verification Code"
-        message = f"Hello,\n\nYour OTP code is: {otp_code}\n\nIt will expire in {otp_expiry_minutes} minutes."
+        message = f"Hello,\n\nYour OTP code is: {otp}\n\nIt will expire in {OTP_EXPIRY_MINUTES} minutes."
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
         return True
     except Exception as e:
@@ -2366,16 +2360,10 @@ def send_verification_email(self, email, otp_code, otp_expiry_minutes):
 
 
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from datetime import datetime, timedelta, timezone
-import bcrypt, re, traceback
-from myapp.tasks import send_verification_email  # <-- Import the Celery task
-from myapp.utils import is_valid_email, generate_otp
-from myapp.mongodb import pending_drivers_collection, drivers_collection
-from myapp.settings_constants import OTP_EXPIRY_MINUTES  # your constant
 
+# ---------- DRIVER REGISTRATION ----------
+
+# ---------- DRIVER REGISTRATION ----------
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_driver(request):
@@ -2383,7 +2371,7 @@ def register_driver(request):
         data = request.data
         print("📩 Received driver registration data:", data)
 
-        # --- Required fields ---
+        # --- Minimal required fields ---
         required_fields = ["username", "email", "pin"]
         for field in required_fields:
             if not data.get(field):
@@ -2413,7 +2401,12 @@ def register_driver(request):
         otp_code = generate_otp()
         otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
 
-        # --- Insert pending driver record ---
+        # --- Send OTP email ---
+        sent = dispatch_verification_code(data["email"], otp_code)
+        if not sent:
+            return Response({"error": "Failed to send verification code. Check email configuration."}, status=503)
+
+        # --- Create pending driver record ---
         pending_driver_doc = {
             "username": data["username"],
             "email": data["email"],
@@ -2429,10 +2422,8 @@ def register_driver(request):
             "speed": 0,
             "lastUpdate": None,
         }
-        inserted_result = pending_drivers_collection.insert_one(pending_driver_doc)
 
-        # --- Send OTP asynchronously ---
-        send_verification_email.delay(data["email"], otp_code, OTP_EXPIRY_MINUTES)
+        inserted_result = pending_drivers_collection.insert_one(pending_driver_doc)
 
         return Response({
             "success": True,

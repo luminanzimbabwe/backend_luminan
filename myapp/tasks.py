@@ -1,14 +1,25 @@
+# tasks.py
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
 
 @shared_task
-def send_verification_email(email, otp_code):
+def send_verification_email(email: str, otp_code: str, expiry_minutes: int):
     """
     Send a verification OTP email asynchronously.
+    
+    Args:
+        email (str): Recipient email address
+        otp_code (str): The OTP code to send
+        expiry_minutes (int): How long the OTP is valid
     """
-    subject = "Your Verification Code"
-    message = f"Hello,\n\nYour OTP code is: {otp_code}\n\nThank you!"
+    subject = "Your LuminaN OTP Verification Code"
+    message = (
+        f"Hello,\n\n"
+        f"Your OTP code is: {otp_code}\n"
+        f"It will expire in {expiry_minutes} minutes.\n\n"
+        "Thank you!"
+    )
     from_email = settings.DEFAULT_FROM_EMAIL
     recipient_list = [email]
 
@@ -22,4 +33,6 @@ def send_verification_email(email, otp_code):
         )
         return f"Email sent successfully to {email}"
     except Exception as e:
+        # You can also log this properly with Django logger
+        print(f"❌ Failed to send OTP to {email}: {e}")
         return f"Failed to send email to {email}: {str(e)}"
