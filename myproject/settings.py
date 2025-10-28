@@ -36,15 +36,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # DEBUG mode from .env
-DEBUG = True
 
-# Allowed hosts from .env
-ALLOWED_HOSTS = ['*']
+DEBUG = config('DEBUG', cast=bool, default=False)
 
 
 
 
-CORS_ALLOW_ALL_ORIGINS = True
+ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='*').split(',')
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', cast=bool, default=True)
 
 
 
@@ -99,23 +98,17 @@ MIDDLEWARE = [
 
 
 
-CORS_ALLOW_METHODS = [
-    'GET',
-    'POST',
-    'PUT',
-    'DELETE',
-    'PATCH',
-    'OPTIONS',
-]
 
-CORS_ALLOW_HEADERS = [
-    'content-type',
-    'accept',
-    'Authorization',
-    'X-Requested-With',
-    "x-admin-pin",
-    'x-csrftoken',
 
+CORS_ALLOW_METHODS = ["*"]
+CORS_ALLOW_HEADERS = ["*"]
+CORS_ALLOW_CREDENTIALS = True
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://backend-luminan.onrender.com",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081"
 ]
 
 
@@ -189,18 +182,7 @@ ADMIN_SECRET_PIN = "26344"
 
 
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8083",
-    "http://127.0.0.1:8083",
-    "http://192.168.137.1:8081",
-    "http://192.168.137.1:8083",
-    "https://backend-luminan.onrender.com"
-]
 
-
-# Optional: if using AJAX, ensure CSRF cookie is set
-CSRF_COOKIE_HTTPONLY = False  # JS can read cookie
-CSRF_COOKIE_SAMESITE = 'Lax'
 
 
 # Database
