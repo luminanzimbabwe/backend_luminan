@@ -67,6 +67,33 @@ checkpw = bcrypt.checkpw
 
 
 
+
+
+# 🧩 Helper class for SimpleJWT compatibility (MongoDB users)
+class SimpleUserMock:
+    def __init__(self, user_id, username="mockuser", email=None):
+        self.id = user_id
+        self.pk = user_id
+        self.username = username
+        self.email = email
+
+    def get_username(self):
+        return self.username
+
+    @property
+    def is_authenticated(self):
+        return True
+
+
+
+# Constants
+ACCESS_TOKEN_LIFETIME = getattr(settings, 'ACCESS_TOKEN_LIFETIME', timedelta(minutes=5))
+REFRESH_TOKEN_LIFETIME = getattr(settings, 'REFRESH_TOKEN_LIFETIME', timedelta(days=7))
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION_MINUTES = 5
+
+# Your SimpleUserMock class is already defined
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def test_view(request):
@@ -221,96 +248,100 @@ def validate_registration_data(data):
 
 
 
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
-    """
-    Handles user registration, validation, password hashing, and initiates the OTP verification process.
-    """
-    # Use request.data.copy() if you need to modify the data before validation/hashing
     data = request.data
 
-    # --- 1. Initial Data Validation ---
-    errors = validate_registration_data(data)
-    if errors:
-        return Response({"error": "Validation failed", "details": errors}, status=400)
-
-    # Normalize username
-    username_lower = data["username"].lower()
-
-    # Extract contact details dynamically
     try:
-        preferred_contact = data["preferred_contact"]
-        # Ensure the contact key exists in the data payload
-        contact_value = data[preferred_contact] 
-    except KeyError:
-        return Response({"error": f"Required data field for '{preferred_contact}' is missing."}, status=400)
+        # -------------------------
+        # 1️⃣ Validation
+        # -------------------------
+        errors = validate_registration_data(data)
+        if errors:
+            return Response({
+                "error": "Validation failed",
+                "details": errors
+            }, status=400)
 
-    try:
-        # --- 2. Check for Existing User ---
-        existing_user = pending_users_collection.find_one({
-             # Check pending and fully registered collections
-             # Assuming a `users_collection` (verified users) and `pending_users_collection` (unverified users)
-             # You should check BOTH here if a user might exist unverified or verified.
+        username_lower = data["username"].lower()
+
+        # -------------------------
+        # 2️⃣ Check for existing users
+        # -------------------------
+        conflict_fields = []
+        existing_user = users_collection.find_one({
             "$or": [
                 {"username_lower": username_lower},
                 {"email": data["email"]},
                 {"phone_number": data["phone_number"]}
             ]
         })
-
         if existing_user:
-            # 409 Conflict is the correct status for resource conflict
-            return Response({"error": "An account with this data already exists."}, status=409)
+            if existing_user.get("username_lower") == username_lower:
+                conflict_fields.append("username")
+            if existing_user.get("email") == data["email"]:
+                conflict_fields.append("email")
+            if existing_user.get("phone_number") == data["phone_number"]:
+                conflict_fields.append("phone_number")
+            return Response({
+                "error": "Account conflict",
+                "details": {field: f"{field} is already in use" for field in conflict_fields}
+            }, status=409)
 
-        # --- 3. Hash Password ---
-        hashed_pw = bcrypt.hashpw(
-            data["password"].encode('utf-8'),
-            bcrypt.gensalt()
-        ).decode('utf-8')
+        # -------------------------
+        # 3️⃣ Hash password
+        # -------------------------
+        hashed_pw = bcrypt.hashpw(data["password"].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-        # --- 4. Generate and Dispatch OTP ---
-        otp_code = generate_otp()
-        otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-
-        if not dispatch_verification_code(preferred_contact, contact_value, otp_code):
-            return Response({"error": "Failed to send verification code. Service unavailable."}, status=503)
-
-        # --- 5. Create Temporary User Document ---
-        temp_user_doc = {
+        # -------------------------
+        # 4️⃣ Create user document
+        # -------------------------
+        user_doc = {
             "username": data["username"],
             "username_lower": username_lower,
             "email": data["email"],
             "phone_number": data["phone_number"],
             "password_hash": hashed_pw,
             "role": "user",
-            "is_verified": False,
-            "otp_code": otp_code,
-            "otp_expiry": otp_expiry,
-            "verification_method": preferred_contact,
+            "is_verified": True,
             "created_at": datetime.utcnow(),
-            "failed_attempts": 0,
         }
 
-        inserted_result = pending_users_collection.insert_one(temp_user_doc)
-        
-        # 🟢 CRITICAL FIX CONFIRMED: Convert ObjectId to string for JSON serialization
-        temp_user_id_str = str(inserted_result.inserted_id) 
+        inserted_result = users_collection.insert_one(user_doc)
+        user_id_str = str(inserted_result.inserted_id)
 
-        # --- 6. Return Success Response ---
-        return Response({
-            "message": "Registration initiated. Verification code sent.",
-            "verification_type": preferred_contact,
-            "contact_sent_to": contact_value,
-            "temp_user_id": temp_user_id_str 
-        }, status=202) # 202 Accepted
+        # -------------------------
+        # 5️⃣ Generate JWT
+        # -------------------------
+        access_token = generate_access_token(user_id_str, "user")
+        refresh_token = generate_refresh_token(user_id_str)
 
-    except Exception as e:
-        # Log the full traceback for server-side debugging
-        import traceback
-        print(f"!!! CRITICAL REGISTRATION ERROR: {traceback.format_exc()}")
+        # -------------------------
+        # 6️⃣ Success Response
+        # -------------------------
         return Response({
-            "error": "Registration failed due to an unexpected server issue. Please try again."
+            "message": "Registration successful.",
+            "access": access_token,
+            "refresh": refresh_token,
+            "user": {
+                "_id": user_id_str,
+                "username": data["username"],
+                "email": data["email"],
+                "is_verified": True,
+            }
+        }, status=201)
+
+    except Exception:
+        # -------------------------
+        # 7️⃣ Catch-all server error
+        # -------------------------
+        traceback.print_exc()
+        return Response({
+            "error": "Server error",
+            "details": "An unexpected error occurred. Please check your input and try again."
         }, status=500)
 
 
@@ -318,38 +349,6 @@ def register_user(request):
 
 
 
-
-
-
-
-
-
-
-
-# 🧩 Helper class for SimpleJWT compatibility (MongoDB users)
-class SimpleUserMock:
-    def __init__(self, user_id, username="mockuser", email=None):
-        self.id = user_id
-        self.pk = user_id
-        self.username = username
-        self.email = email
-
-    def get_username(self):
-        return self.username
-
-    @property
-    def is_authenticated(self):
-        return True
-
-
-
-# Constants
-ACCESS_TOKEN_LIFETIME = getattr(settings, 'ACCESS_TOKEN_LIFETIME', timedelta(minutes=5))
-REFRESH_TOKEN_LIFETIME = getattr(settings, 'REFRESH_TOKEN_LIFETIME', timedelta(days=7))
-MAX_LOGIN_ATTEMPTS = 5
-LOCKOUT_DURATION_MINUTES = 5
-
-# Your SimpleUserMock class is already defined
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -557,8 +556,6 @@ def dispatch_login_notification(user_email, username, identifier, ip_address=Non
 
 
 
-
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
@@ -595,10 +592,6 @@ def login_user(request):
                 "retry_after": f"{minutes}m {seconds}s"
             }, status=429)
 
-        # Check verification
-        if not user.get('is_verified', False):
-            return Response({"error": "Account not verified."}, status=403)
-
         # Password check
         stored_hash = user.get('password_hash')
         if isinstance(stored_hash, str):
@@ -619,20 +612,9 @@ def login_user(request):
                 {"$set": {"failed_login_attempts": 0, "lockout_time": None}}
             )
 
-        # Generate JWT tokens using the project's helpers (MongoDB user IDs)
+        # Generate JWT tokens
         access_token = generate_access_token(str(user["_id"]), user.get("role", "user"))
         refresh_token = generate_refresh_token(str(user["_id"]))
-
-        # Dispatch login notification
-        ip_address = request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR')
-        device_info = request.META.get('HTTP_USER_AGENT', 'Unknown Device')
-        dispatch_login_notification(
-            user_email=user["email"],
-            username=user["username"],
-            identifier=identifier,
-            ip_address=ip_address,
-            device_info=device_info
-        )
 
         # Update last login
         users_collection.update_one(
@@ -646,9 +628,9 @@ def login_user(request):
             "username": user["username"],
             "email": user.get("email"),
             "role": user.get("role", "user"),
+            "is_verified": True  # Always true since no OTP
         }
 
-        # Standardized response: top-level tokens + legacy keys + user object
         resp = {
             "access": access_token,
             "refresh": refresh_token,
@@ -659,11 +641,9 @@ def login_user(request):
 
         return Response(resp, status=200)
 
-    except Exception as e:
+    except Exception:
         print(f"Login error: {traceback.format_exc()}")
         return Response({"error": "Login failed due to a server error."}, status=500)
-
-
 
 
 
@@ -981,57 +961,48 @@ def logout_user(request):
 # the delete_account view (with the get_user_from_token check).
 
 
-
 # -------------------------
-# Delete account endpoint (Refined)
+# Delete account endpoint
 # -------------------------
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_account(request):
+    """
+    Deletes a user account after verifying the password.
+    """
     user = request.user
 
-    # Verify password is provided and correct
+    # Step 1: Ensure password is provided
     password = request.data.get('password')
     if not password:
         return Response({"error": "Password is required for account deletion."}, status=400)
 
-    # For SimpleUser model, check password manually since it might not have check_password method
+    # Step 2: Verify password against password_hash
     try:
-        # Assuming SimpleUser has a password field that stores hashed password
-        from django.contrib.auth.hashers import check_password
-        if hasattr(user, 'password') and user.password:
-            if not check_password(password, user.password):
-                return Response({"error": "Invalid password."}, status=400)
+        if hasattr(user, 'password_hash') and user.password_hash:
+            if not check_password(password, user.password_hash):
+                return Response({"error": "Invalid password. Account deletion denied."}, status=403)
         else:
-            # If no password field or empty password, skip verification for now
-            # User is already authenticated via JWT token
-            pass
+            # User has no password set; deletion not allowed
+            return Response({"error": "User password not set. Cannot verify account deletion."}, status=403)
     except Exception as e:
-        # If password verification fails for any reason, skip it
-        # User is already authenticated via JWT token
-        pass
+        return Response({"error": "Password verification failed.", "details": str(e)}, status=500)
 
+    # Step 3: Delete user from MongoDB
     try:
-        # Get user ID - assuming user.id is the string/ObjectId
-        user_id = user.id
-
-        # Delete user from database
+        user_id = user.id  # MongoDB ObjectId as string
         result = users_collection.delete_one({"_id": ObjectId(user_id)})
 
         if result.deleted_count == 0:
             return Response({"error": "User account not found."}, status=404)
 
-        # Optional: Send confirmation email or log the action
-        # dispatch_account_deletion_confirmation(user.email, user.username)
+        # Optional: Log or send confirmation email here
 
         return Response({"message": "Account and all associated data deleted successfully."}, status=200)
 
     except Exception as e:
         # Log the error in production
-        # logger.error(f"Account deletion error: {str(e)}")
-        return Response({"error": "Account deletion failed due to a server issue."}, status=500)
-
-
+        return Response({"error": "Account deletion failed due to a server issue.", "details": str(e)}, status=500)
 
 
 
@@ -2236,12 +2207,7 @@ def generate_otp():
 
 
 
-
-
-
-# ---------- DRIVER REGISTRATION ----------
-
-# ---------- DRIVER REGISTRATION ----------
+# ---------- DRIVER REGISTRATION (No OTP Verification) ----------
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_driver(request):
@@ -2263,59 +2229,56 @@ def register_driver(request):
         if not re.fullmatch(r"\d{4,6}", data["pin"]):
             return Response({"error": "PIN must be 4-6 digits."}, status=400)
 
-        # --- Check for duplicates ---
-        existing_driver = pending_drivers_collection.find_one({"$or": [
-            {"username": data["username"]}, {"email": data["email"]}
-        ]}) or drivers_collection.find_one({"$or": [
+        # --- Check for duplicates in both collections ---
+        existing_driver = drivers_collection.find_one({"$or": [
             {"username": data["username"]}, {"email": data["email"]}
         ]})
+        # We only check the main drivers_collection since pending_drivers_collection is no longer used
         if existing_driver:
             return Response({"error": "Driver already exists."}, status=409)
 
         # --- Hash PIN ---
         hashed_pin = bcrypt.hashpw(data["pin"].encode(), bcrypt.gensalt()).decode()
 
-        # --- Generate OTP ---
-        otp_code = generate_otp()
-        otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
-
-        # --- Send OTP email ---
-        
-        sent = dispatch_verification_code(
-    contact_type="email",        # first argument
-    contact_value=data["email"], # second argument
-    code=otp_code                # third argument
-)
-
-        if not sent:
-            return Response({"error": "Failed to send verification code. Check email configuration."}, status=503)
-
-        # --- Create pending driver record ---
-        pending_driver_doc = {
+        # --- Create final driver record (No OTP/Pending state) ---
+        final_driver_doc = {
             "username": data["username"],
             "email": data["email"],
             "pin": hashed_pin,
-            "otp_code": otp_code,
-            "otp_expiry": otp_expiry,
-            "is_verified": False,
+            "is_verified": True,  # <-- Driver is marked as verified immediately
             "created_at": datetime.now(timezone.utc),
-            "failed_attempts": 0,
-            "lockout_start": None,
+            "verified_at": datetime.now(timezone.utc), # Add verification timestamp
             # Frontend tracking fields
             "currentLocation": {"lat": 0.0, "lng": 0.0},
             "speed": 0,
             "lastUpdate": None,
         }
 
-        inserted_result = pending_drivers_collection.insert_one(pending_driver_doc)
+        # --- Insert into permanent drivers collection ---
+        inserted_result = drivers_collection.insert_one(final_driver_doc)
+
+        # Optional: send welcome email (can be adjusted to a simpler notification)
+        try:
+            dispatch_welcome_email(final_driver_doc["email"], final_driver_doc["username"])
+        except Exception as e:
+            print("⚠️ Failed to send welcome email:", e)
+
+        # Response
+        driver_response = {
+            "_id": str(inserted_result.inserted_id),
+            "username": final_driver_doc.get("username"),
+            "email": final_driver_doc.get("email"),
+            "is_verified": True,
+            "currentLocation": final_driver_doc.get("currentLocation"),
+            "speed": final_driver_doc.get("speed"),
+            "lastUpdate": final_driver_doc.get("lastUpdate"),
+        }
 
         return Response({
             "success": True,
-            "message": "Driver registration initiated. Verification code sent to email.",
-            "temp_driver_id": str(inserted_result.inserted_id),
-            "verification_type": "email",
-            "contact_sent_to": data["email"]
-        }, status=202)
+            "message": "Driver registered and verified successfully.",
+            "driver": driver_response
+        }, status=201) # Changed status to 201 Created since the resource is finalized
 
     except Exception:
         print(f"🔥 DRIVER REGISTRATION ERROR:\n{traceback.format_exc()}")
@@ -2545,20 +2508,11 @@ def get_updated_order(order_id):
     }
 
 # ---------------- PATCH ENDPOINTS ----------------
-
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from bson import ObjectId
-from datetime import datetime
-
 @api_view(['PATCH', 'POST'])
 @permission_classes([AllowAny])
 def confirm_order(request, order_id):
     """
-    Confirms an order by a driver.
-    Assigns the driver to the order when confirmed.
+    Confirms any order and assigns a driver.
     """
     try:
         # Validate order ObjectId
@@ -2572,35 +2526,25 @@ def confirm_order(request, order_id):
         if not order:
             return Response({"error": "Order not found"}, status=404)
 
-        # Get driver_id from request
-        driver_id = request.data.get("driver_id")
-        if not driver_id:
-            return Response({"error": "driver_id is required"}, status=400)
-
-        # Validate driver_id
-        try:
-            oid_driver = ObjectId(driver_id)
-        except Exception:
-            return Response({"error": "Invalid driver ID format"}, status=400)
-
-        # Optional: check if driver exists
-        driver = drivers_collection.find_one({"_id": oid_driver})
-        if not driver:
-            return Response({"error": "Driver not found"}, status=404)
-
-        # Check if already confirmed by someone
+        # If already confirmed, return current order
         if order.get("order_status") == "confirmed":
             return Response({
                 "message": "Order is already confirmed",
                 "order": get_updated_order(order_id)
             }, status=200)
 
-        # Update order with driver assignment
+        # Determine driver assignment
+        driver_id = request.data.get("driver_id")
+        if not driver_id:
+            return Response({"error": "Driver ID must be provided to confirm order"}, status=400)
+
+        # Update order to confirmed + assign driver
         gas_orders.update_one(
             {"_id": oid_order},
             {"$set": {
                 "order_status": "confirmed",
                 "assigned_driver_id": driver_id,
+                "confirmed_at": datetime.now(),
                 "updated_at": datetime.now()
             }}
         )
@@ -2608,14 +2552,13 @@ def confirm_order(request, order_id):
         # Return updated order
         updated_order = get_updated_order(order_id)
         return Response({
-            "message": "Order confirmed successfully",
+            "message": "Order confirmed and driver assigned successfully",
             "order": updated_order
         }, status=200)
 
     except Exception as e:
         print(f"Error confirming order: {e}")
         return Response({"error": "Failed to confirm order", "details": str(e)}, status=500)
-
 
 
 from rest_framework.decorators import api_view, permission_classes

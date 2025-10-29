@@ -20,7 +20,7 @@ load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 
@@ -79,11 +79,23 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 # Make sure your Gmail account allows sending from this address if different from EMAIL_HOST_USER.
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL') 
 
+import os
 
 CHANNEL_LAYERS = {
-    "default": {"BACKEND": "channels_redis.core.RedisChannelLayer",
-                "CONFIG": {"hosts": [("127.0.0.1", 6379)]}}
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "address": os.getenv("REDIS_HOST", "127.0.0.1"),
+                    "port": int(os.getenv("REDIS_PORT", 6379)),
+                    "password": os.getenv("REDIS_PASSWORD", None),
+                }
+            ],
+        },
+    },
 }
+
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -232,6 +244,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

@@ -4486,3 +4486,45 @@ Internal Server Error: /api/v1/driver/performance/
 "GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
 Internal Server Error: /api/v1/driver/performance/
 "GET //api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=68fa44a7edfa757ea19e0ed8 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=68fa44a7edfa757ea19e0ed8 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=68fa44a7edfa757ea19e0ed8 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+Internal Server Error: /api/v1/driver/performance/
+"GET /api/v1/driver/performance/?driver_id=6900bbc93c9f92a9882679b0 HTTP/1.1" 500 102
+You're accessing the development server over HTTPS, but it only supports HTTP.
+You're accessing the development server over HTTPS, but it only supports HTTP.
+You're accessing the development server over HTTPS, but it only supports HTTP.
+You're accessing the development server over HTTPS, but it only supports HTTP.
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/
+Internal Server Error: /api/v1/driver/performance/

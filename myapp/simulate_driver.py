@@ -7,7 +7,7 @@ from datetime import datetime
 
 # --- CONFIGURATION ---
 ORDER_ID = "68fb43ea6d8b40cce800f624"  # your test order ID
-DRIVER_ID = "68fb5f049ed7068eca712dbd"  # your driver ID
+DRIVER_ID = "6900bbc93c9f92a9882679b0"  # your driver ID
 WEBSOCKET_URL = f"ws://127.0.0.1:8000/ws/track/{ORDER_ID}/"
 
 # Bounding box for simulation (e.g., Harare area)
