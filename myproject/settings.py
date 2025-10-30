@@ -43,7 +43,30 @@ DEBUG = config('DEBUG', cast=bool, default=False)
 
 
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='*').split(',')
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', cast=bool, default=True)
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://localhost:8082",
+    "http://127.0.0.1:8082",
+    "http://localhost:8083",
+    "http://127.0.0.1:8083",
+    "http://localhost:8084",
+    "http://127.0.0.1:8084",
+    "http://localhost:8085",
+    "http://127.0.0.1:8085",
+    "http://localhost:8086",
+    "http://127.0.0.1:8086",
+    "http://localhost:8087",
+    "http://127.0.0.1:8087",
+    "http://localhost:8088",
+    "http://127.0.0.1:8088",
+    "http://localhost:8089",
+    "http://127.0.0.1:8089",
+    "http://localhost:8090",
+    "http://127.0.0.1:8090",
+    "https://backend-luminan.onrender.com",
+]
 
 
 
@@ -110,8 +133,18 @@ MIDDLEWARE = [
 
 
 CORS_ALLOW_METHODS = ["*"]
-CORS_ALLOW_HEADERS = ["*"]
-CORS_ALLOW_CREDENTIALS = False
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+CORS_ALLOW_CREDENTIALS = True
 
 
 CSRF_TRUSTED_ORIGINS = [

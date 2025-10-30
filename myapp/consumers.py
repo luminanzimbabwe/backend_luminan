@@ -177,3 +177,84 @@ class AdminDriverTrackingConsumer(AsyncWebsocketConsumer):
             "event": "driver_update",
             "driver": driver_payload
         }))
+
+
+
+# --- DRIVER LIVE LOCATION WEBSOCKET ---
+class DriverTrackingConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.driver_id = self.scope["url_route"]["kwargs"]["driver_id"]
+        self.group_name = f"driver_{self.driver_id}"
+
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+        await self.send(json.dumps({
+            "event": "connected",
+            "message": f"Driver {self.driver_id} connected for tracking."
+        }))
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        """
+        Expect driver to send GPS updates:
+        {
+            "lat": <float>,
+            "lng": <float>
+        }
+        """
+        try:
+            data = json.loads(text_data)
+            lat, lng = data.get("lat"), data.get("lng")
+
+            if lat is None or lng is None:
+                await self.send(json.dumps({
+                    "event": "error",
+                    "message": "Missing lat/lng"
+                }))
+                return
+
+            now = datetime.now(timezone.utc)
+
+            # Update driver location in DB
+            drivers_collection.update_one(
+                {"_id": ObjectId(self.driver_id)},
+                {"$set": {"current_location": {
+                    "lat": float(lat),
+                    "lng": float(lng),
+                    "timestamp": now
+                }}}
+            )
+
+            # Broadcast to admin dashboard group
+            await self.channel_layer.group_send(
+                "admin_driver_tracking",
+                {
+                    "type": "driver_location_update",
+                    "driver_id": self.driver_id,
+                    "lat": float(lat),
+                    "lng": float(lng),
+                    "timestamp": str(now)
+                }
+            )
+
+            # Optionally notify user tracking this driver (if needed)
+            await self.channel_layer.group_send(
+                f"order_{self.driver_id}",
+                {
+                    "type": "location_update",
+                    "lat": float(lat),
+                    "lng": float(lng),
+                    "driver_id": self.driver_id,
+                    "timestamp": str(now)
+                }
+            )
+
+        except Exception as e:
+            print(f"❌ DriverTrackingConsumer error: {e}")
+            await self.send(json.dumps({
+                "event": "error",
+                "message": str(e)
+            }))
