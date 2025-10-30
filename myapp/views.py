@@ -2205,9 +2205,21 @@ def generate_otp():
     return str(randint(100000, 999999))
 
 
+# ---------- DRIVER REGISTRATION (No OTP Verification + One-Time Token) ----------
+import re
+import bcrypt
+import traceback
+from datetime import datetime, timezone
+import secrets  # ✅ new: for generating secure random token
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+
+# Assuming you already have these imported in your file
+# from your_project.utils import is_valid_email, dispatch_welcome_email
+# from your_project.database import drivers_collection
 
 
-# ---------- DRIVER REGISTRATION (No OTP Verification) ----------
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_driver(request):
@@ -2229,60 +2241,133 @@ def register_driver(request):
         if not re.fullmatch(r"\d{4,6}", data["pin"]):
             return Response({"error": "PIN must be 4-6 digits."}, status=400)
 
-        # --- Check for duplicates in both collections ---
-        existing_driver = drivers_collection.find_one({"$or": [
-            {"username": data["username"]}, {"email": data["email"]}
-        ]})
-        # We only check the main drivers_collection since pending_drivers_collection is no longer used
+        # --- Check for duplicates ---
+        existing_driver = drivers_collection.find_one({
+            "$or": [{"username": data["username"]}, {"email": data["email"]}]
+        })
         if existing_driver:
             return Response({"error": "Driver already exists."}, status=409)
 
         # --- Hash PIN ---
         hashed_pin = bcrypt.hashpw(data["pin"].encode(), bcrypt.gensalt()).decode()
 
-        # --- Create final driver record (No OTP/Pending state) ---
+        # ✅ --- Generate one-time access token ---
+        one_time_token = secrets.token_hex(32)  # 64-character secure hex token
+
+        # --- Create final driver record ---
         final_driver_doc = {
             "username": data["username"],
             "email": data["email"],
             "pin": hashed_pin,
-            "is_verified": True,  # <-- Driver is marked as verified immediately
+            "token": one_time_token,  # ✅ new field
+            "is_verified": True,
             "created_at": datetime.now(timezone.utc),
-            "verified_at": datetime.now(timezone.utc), # Add verification timestamp
+            "verified_at": datetime.now(timezone.utc),
             # Frontend tracking fields
             "currentLocation": {"lat": 0.0, "lng": 0.0},
             "speed": 0,
             "lastUpdate": None,
         }
 
-        # --- Insert into permanent drivers collection ---
+        # --- Insert into drivers collection ---
         inserted_result = drivers_collection.insert_one(final_driver_doc)
 
-        # Optional: send welcome email (can be adjusted to a simpler notification)
+        # --- Send welcome email (optional) ---
         try:
             dispatch_welcome_email(final_driver_doc["email"], final_driver_doc["username"])
         except Exception as e:
             print("⚠️ Failed to send welcome email:", e)
 
-        # Response
+        # --- Build response ---
         driver_response = {
             "_id": str(inserted_result.inserted_id),
-            "username": final_driver_doc.get("username"),
-            "email": final_driver_doc.get("email"),
+            "username": final_driver_doc["username"],
+            "email": final_driver_doc["email"],
             "is_verified": True,
-            "currentLocation": final_driver_doc.get("currentLocation"),
-            "speed": final_driver_doc.get("speed"),
-            "lastUpdate": final_driver_doc.get("lastUpdate"),
+            "token": one_time_token,  # ✅ return token to the app
+            "currentLocation": final_driver_doc["currentLocation"],
+            "speed": final_driver_doc["speed"],
+            "lastUpdate": final_driver_doc["lastUpdate"],
         }
 
         return Response({
             "success": True,
-            "message": "Driver registered and verified successfully.",
+            "message": "Driver registered successfully. Use this token for all requests.",
             "driver": driver_response
-        }, status=201) # Changed status to 201 Created since the resource is finalized
+        }, status=201)
 
     except Exception:
         print(f"🔥 DRIVER REGISTRATION ERROR:\n{traceback.format_exc()}")
         return Response({"error": "Registration failed due to a server error."}, status=500)
+
+
+
+# ---------- DRIVER LOGIN (PIN-Based) ----------
+import bcrypt
+import secrets
+import traceback
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from datetime import datetime, timezone
+
+# Assuming drivers_collection is your MongoDB collection
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_driver(request):
+    try:
+        data = request.data
+        username_or_email = data.get("username_or_email")
+        pin = data.get("pin")
+
+        if not username_or_email or not pin:
+            return Response({"error": "Username/email and PIN are required."}, status=400)
+
+        # --- Find driver by username or email ---
+        driver = drivers_collection.find_one({
+            "$or": [{"username": username_or_email}, {"email": username_or_email}]
+        })
+
+        if not driver:
+            return Response({"error": "Driver not found."}, status=404)
+
+        # --- Verify PIN ---
+        if not bcrypt.checkpw(pin.encode(), driver["pin"].encode()):
+            return Response({"error": "Incorrect PIN."}, status=401)
+
+        # --- Generate new one-time token ---
+        new_token = secrets.token_hex(32)
+
+        # --- Update driver record with new token ---
+        drivers_collection.update_one(
+            {"_id": driver["_id"]},
+            {"$set": {"token": new_token, "lastLogin": datetime.now(timezone.utc)}}
+        )
+
+        # --- Build response ---
+        driver_response = {
+            "_id": str(driver["_id"]),
+            "username": driver["username"],
+            "email": driver["email"],
+            "is_verified": driver.get("is_verified", True),
+            "token": new_token,
+            "currentLocation": driver.get("currentLocation", {"lat": 0.0, "lng": 0.0}),
+            "speed": driver.get("speed", 0),
+            "lastUpdate": driver.get("lastUpdate"),
+        }
+
+        return Response({
+            "success": True,
+            "message": "Driver logged in successfully.",
+            "driver": driver_response
+        }, status=200)
+
+    except Exception:
+        print(f"🔥 DRIVER LOGIN ERROR:\n{traceback.format_exc()}")
+        return Response({"error": "Login failed due to a server error."}, status=500)
+
 
 
 # ---------- VERIFY DRIVER OTP ----------
@@ -2416,66 +2501,6 @@ def driver_authenticated(view_func):
 
 
 
-# ---------- LOGIN DRIVER ----------
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def login_driver(request):
-    try:
-        data = request.data
-        identifier = data.get("identifier")  # can be username or email
-        password = data.get("password")
-
-        if not identifier or not password:
-            return Response({"error": "Identifier and password are required"}, status=400)
-
-        # Find driver by username or email
-        driver = drivers_collection.find_one({
-            "$or": [
-                {"username": identifier},
-                {"email": identifier}
-            ]
-        })
-
-        if not driver:
-            return Response({"error": "Invalid username/email or password"}, status=401)
-
-        # Check if account is verified
-        if not driver.get('is_verified', False):
-            return Response({"error": "Account not verified."}, status=403)
-
-        # Verify password
-        stored_password = driver.get('password_hash')
-        if not stored_password:
-            return Response({"error": "Password not set for this account."}, status=500)
-
-        if isinstance(stored_password, str):
-            stored_password = stored_password.encode('utf-8')
-
-        if not checkpw(password.encode('utf-8'), stored_password):
-            return Response({"error": "Invalid username/email or password"}, status=401)
-
-        # Update last_login only (no auth token)
-        last_login = datetime.utcnow()
-        drivers_collection.update_one({"_id": driver["_id"]}, {"$set": {"last_login": last_login}})
-
-        # Minimalistic driver response required by the client
-        driver_resp = {
-            "_id": str(driver["_id"]),
-            "username": driver.get("username"),
-            "email": driver.get("email"),
-            "is_verified": True,
-            "currentLocation": driver.get("currentLocation", {"lat": 0.0, "lng": 0.0}),
-            "speed": driver.get("speed", 0),
-            "lastUpdate": driver.get("lastUpdate"),
-        }
-
-        return Response({"success": True, "driver": driver_resp}, status=200)
-
-    except Exception:
-        print(f"🔥 DRIVER LOGIN ERROR:\n{traceback.format_exc()}")
-        return Response({"error": "Login failed"}, status=500)
-
-
 
 
 
@@ -2507,38 +2532,71 @@ def get_updated_order(order_id):
         "customer_id": str(order.get("customer_id")) if order.get("customer_id") else None
     }
 
-# ---------------- PATCH ENDPOINTS ----------------
+
+def get_updated_order(order_id):
+    """Helper function to fetch a fresh order record by ID."""
+    try:
+        oid_order = ObjectId(order_id)
+        order = gas_orders.find_one({"_id": oid_order})
+        if not order:
+            return None
+        order["_id"] = str(order["_id"])
+        return order
+    except Exception as e:
+        print(f"Error fetching updated order: {e}")
+        return None
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from bson import ObjectId
+from datetime import datetime
+
+
 @api_view(['PATCH', 'POST'])
 @permission_classes([AllowAny])
 def confirm_order(request, order_id):
     """
     Confirms any order and assigns a driver.
+    Requires Authorization header with token + driver_id in request body.
     """
     try:
-        # Validate order ObjectId
+        # --- 1. Get token from headers ---
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return Response({"error": "Authorization token required"}, status=401)
+
+        token = auth_header.split(" ")[1]
+
+        # --- 2. Verify token matches the driver_id provided ---
+        driver_id = request.data.get("driver_id")
+        if not driver_id:
+            return Response({"error": "Driver ID must be provided to confirm order"}, status=400)
+
+        driver = drivers_collection.find_one({"_id": ObjectId(driver_id)})
+        if not driver or driver.get("token") != token:
+            return Response({"error": "Invalid token for this driver"}, status=403)
+
+        # --- 3. Validate order ObjectId ---
         try:
             oid_order = ObjectId(order_id)
         except Exception:
             return Response({"error": "Invalid order ID format"}, status=400)
 
-        # Fetch order
+        # --- 4. Fetch order ---
         order = gas_orders.find_one({"_id": oid_order})
         if not order:
             return Response({"error": "Order not found"}, status=404)
 
-        # If already confirmed, return current order
+        # --- 5. Check if already confirmed ---
         if order.get("order_status") == "confirmed":
             return Response({
                 "message": "Order is already confirmed",
                 "order": get_updated_order(order_id)
             }, status=200)
 
-        # Determine driver assignment
-        driver_id = request.data.get("driver_id")
-        if not driver_id:
-            return Response({"error": "Driver ID must be provided to confirm order"}, status=400)
-
-        # Update order to confirmed + assign driver
+        # --- 6. Update order to confirmed + assign driver ---
         gas_orders.update_one(
             {"_id": oid_order},
             {"$set": {
@@ -2549,7 +2607,7 @@ def confirm_order(request, order_id):
             }}
         )
 
-        # Return updated order
+        # --- 7. Return updated order ---
         updated_order = get_updated_order(order_id)
         return Response({
             "message": "Order confirmed and driver assigned successfully",
@@ -2561,43 +2619,61 @@ def confirm_order(request, order_id):
         return Response({"error": "Failed to confirm order", "details": str(e)}, status=500)
 
 
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from bson import ObjectId
 from datetime import datetime
 
-# ---- CANCEL ORDER ----
+
+
+# ---- CANCEL ORDER (Token + Driver ID) ----
 @api_view(['PATCH', 'POST'])
 @permission_classes([AllowAny])
 def cancel_order(request, order_id):
     """
-    Cancels any order without driver restrictions.
-    Anyone can cancel an order.
+    Cancels an order. Requires Authorization header with token + driver_id in request body.
     """
     try:
-        # Validate ObjectId
+        # --- 1. Get token from headers ---
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return Response({"error": "Authorization token required"}, status=401)
+
+        token = auth_header.split(" ")[1]
+
+        # --- 2. Verify token matches driver_id ---
+        driver_id = request.data.get("driver_id")
+        if not driver_id:
+            return Response({"error": "Driver ID must be provided to cancel order"}, status=400)
+
+        driver = drivers_collection.find_one({"_id": ObjectId(driver_id)})
+        if not driver or driver.get("token") != token:
+            return Response({"error": "Invalid token for this driver"}, status=403)
+
+        # --- 3. Validate order ObjectId ---
         try:
             oid_order = ObjectId(order_id)
         except Exception:
             return Response({"error": "Invalid order ID format"}, status=400)
 
-        # Find the order
+        # --- 4. Fetch order ---
         order = gas_orders.find_one({"_id": oid_order})
         if not order:
             return Response({"error": "Order not found"}, status=404)
 
-        # If already cancelled
+        # --- 5. Check if already cancelled ---
         if order.get("order_status") == "cancelled":
             return Response({
                 "message": "Order is already cancelled",
                 "order": get_updated_order(order_id)
             }, status=200)
 
-        # Get cancellation reason
-        reason = request.data.get("reason", "Cancelled by system")
+        # --- 6. Get cancellation reason ---
+        reason = request.data.get("reason", "Cancelled by driver")
 
-        # Update the order
+        # --- 7. Update order ---
         gas_orders.update_one(
             {"_id": oid_order},
             {"$set": {
@@ -2607,43 +2683,71 @@ def cancel_order(request, order_id):
             }}
         )
 
-        # Return updated order
+        # --- 8. Return updated order ---
         updated_order = get_updated_order(order_id)
-        return Response({"message": "Order cancelled successfully", "order": updated_order}, status=200)
+        return Response({
+            "message": "Order cancelled successfully",
+            "order": updated_order
+        }, status=200)
 
     except Exception as e:
         print(f"Error cancelling order: {e}")
         return Response({"error": "Failed to cancel order", "details": str(e)}, status=500)
 
 
-# ---- MARK DELIVERED ----
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from bson import ObjectId
+from datetime import datetime
+
+
+# ---- MARK DELIVERED (Token + Driver ID) ----
 @api_view(['PATCH', 'POST'])
 @permission_classes([AllowAny])
 def mark_delivered(request, order_id):
     """
-    Marks any order as delivered without driver restrictions.
-    Anyone can mark an order as delivered.
+    Marks an order as delivered.
+    Requires Authorization header with token + driver_id in request body.
     """
     try:
-        # Validate ObjectId
+        # --- 1. Get token from headers ---
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return Response({"error": "Authorization token required"}, status=401)
+
+        token = auth_header.split(" ")[1]
+
+        # --- 2. Verify token matches driver_id ---
+        driver_id = request.data.get("driver_id")
+        if not driver_id:
+            return Response({"error": "Driver ID must be provided to mark delivered"}, status=400)
+
+        driver = drivers_collection.find_one({"_id": ObjectId(driver_id)})
+        if not driver or driver.get("token") != token:
+            return Response({"error": "Invalid token for this driver"}, status=403)
+
+        # --- 3. Validate order ObjectId ---
         try:
             oid_order = ObjectId(order_id)
         except Exception:
             return Response({"error": "Invalid order ID format"}, status=400)
 
-        # Find the order
+        # --- 4. Fetch order ---
         order = gas_orders.find_one({"_id": oid_order})
         if not order:
             return Response({"error": "Order not found"}, status=404)
 
-        # If already delivered
+        # --- 5. Check if already delivered ---
         if order.get("order_status") == "delivered":
             return Response({
                 "message": "Order already marked as delivered",
                 "order": get_updated_order(order_id)
             }, status=200)
 
-        # Update the order
+        # --- 6. Update order ---
         gas_orders.update_one(
             {"_id": oid_order},
             {"$set": {
@@ -2653,13 +2757,18 @@ def mark_delivered(request, order_id):
             }}
         )
 
-        # Return updated order
+        # --- 7. Return updated order ---
         updated_order = get_updated_order(order_id)
-        return Response({"message": "Order marked as delivered successfully", "order": updated_order}, status=200)
+        return Response({
+            "message": "Order marked as delivered successfully",
+            "order": updated_order
+        }, status=200)
 
     except Exception as e:
         print(f"Error marking order delivered: {e}")
         return Response({"error": "Failed to mark order as delivered", "details": str(e)}, status=500)
+
+
 
 
 
@@ -2879,17 +2988,40 @@ def calculate_metrics_for_driver(driver_id):
 
 # ---------------- DRF API View ----------------
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from bson import ObjectId
+
+# ---------------- DRF API View (Token-Secured) ----------------
 @api_view(['GET'])
 @permission_classes([AllowAny]) 
 def driver_performance_metrics(request, driver_id):
-    
     """
     Retrieves key performance and sales metrics (Daily, Weekly, Monthly, Lifetime)
     for a specific driver.
+    Requires Authorization header with token.
     """
     try:
+        # --- 1. Get token from headers ---
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return Response({"error": "Authorization token required"}, status=401)
+
+        token = auth_header.split(" ")[1]
+
+        # --- 2. Verify token matches driver_id ---
+        try:
+            driver_obj_id = ObjectId(driver_id)
+        except Exception:
+            return Response({"error": "Invalid driver ID format"}, status=400)
+
+        driver = drivers_collection.find_one({"_id": driver_obj_id})
+        if not driver or driver.get("token") != token:
+            return Response({"error": "Invalid token for this driver"}, status=403)
+
+        # --- 3. Calculate metrics ---
         metrics = calculate_metrics_for_driver(driver_id)
-        
         if "error" in metrics:
              return Response({"error": metrics["error"]}, status=400)
 
@@ -2900,9 +3032,9 @@ def driver_performance_metrics(request, driver_id):
         }, status=200)
 
     except Exception as e:
-        # NOTE: In a production environment, use proper logging instead of print()
         print(f"Error retrieving driver performance: {e}")
         return Response({"error": "Failed to retrieve performance data", "details": str(e)}, status=500)
+
 
 
 

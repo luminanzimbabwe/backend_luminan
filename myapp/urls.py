@@ -96,7 +96,6 @@ urlpatterns = [
 
     # --- Driver Auth & Management ---
     path('api/v1/driver/register/', register_driver, name='driver_register'),
-    path('api/v1/driver/login/', login_driver, name='driver_login'),
     path('api/v1/driver/profile/<str:driver_id>/', views.get_driver_profile, name='driver_profile'),
     path('api/v1/driver/orders/', driver_assigned_orders, name='driver_list_assigned_orders'),
     path('api/v1/driver/location/update/', update_driver_location, name='driver_update_location'),
@@ -123,6 +122,9 @@ urlpatterns = [
     path('api/v1/driver/<str:driver_id>/performance/', driver_performance_metrics, name='driver-performance'),
     path('api/v1/orders/<str:order_id>/tracking-details/', get_order_tracking_details, name='order-tracking-details'),
     path('api/v1/driver/driver/orders/<str:order_id>/', driver_get_order, name='driver-get-order'),
+
+
+    path('api/v1/driver/login/', login_driver, name='driver_login'),
 
 
 
