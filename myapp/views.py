@@ -1762,53 +1762,78 @@ def list_user_orders(request):
 
 
 
+
+
+
+
+from bson import ObjectId
+from datetime import datetime
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+def to_str_id(value):
+    """Safely convert ObjectId or any other type to str."""
+    return str(value) if isinstance(value, ObjectId) else value
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_order_detail(request, order_id):
     user = request.user
-    
+
     try:
-        # 1. Convert order_id to ObjectId
+        # 1️⃣ Validate order_id
         try:
             oid = ObjectId(order_id)
-        except Exception: # Use a generic exception for invalid ObjectId
+        except Exception:
             return Response({"error": "Invalid order ID format"}, status=400)
 
-        # 2. Fetch order
+        # 2️⃣ Fetch order
         order = db.gas_orders.find_one({"_id": oid})
         if not order:
             return Response({"error": "Order not found"}, status=404)
 
-        # 3. CRITICAL: Authorization Check (The order MUST belong to the user)
-        # Compare the stored customer_id (ObjectId) to the authenticated user's ID (string from token)
-        if str(order["customer_id"]) != str(user.id):
+        # 3️⃣ Auth check
+        if str(order.get("customer_id")) != str(user.id):
             return Response({"error": "You do not have permission to view this order"}, status=403)
 
-        # 4. Data Enrichment (Fetch product info)
+        # 4️⃣ Fetch product safely
         product = db.products.find_one({"_id": order["product_id"]})
         product_name = product.get("name") if product else "Unknown Product"
 
-        # 5. Prepare and Serialize Response
+        # 5️⃣ Build serializable response
         order_detail = {
-            "order_id": str(order["_id"]),
+            "order_id": to_str_id(order["_id"]),
             "product_name": product_name,
-            "product_id": str(order["product_id"]),
-            "quantity": order["quantity"],
-            "total_price": order["total_price"],
-            "unit_price": order["unit_price"],
-            "delivery_address": order["delivery_address"],
-            "order_status": order["order_status"],
-            # 💡 Serialize datetime objects to ISO format
-            "created_at": order.get("created_at").isoformat() if isinstance(order.get("created_at"), datetime) else None,
-            "updated_at": order.get("updated_at").isoformat() if isinstance(order.get("updated_at"), datetime) else None,
+            "product_id": to_str_id(order.get("product_id")),
+            "quantity": order.get("quantity"),
+            "total_price": order.get("total_price"),
+            "unit_price": order.get("unit_price"),
+            "delivery_address": order.get("delivery_address"),
+            "order_status": order.get("order_status"),
+            "customer_id": to_str_id(order.get("customer_id")),
+            "assigned_driver_id": to_str_id(order.get("assigned_driver_id")),
+            "accepted_driver_id": to_str_id(order.get("accepted_driver_id")),
+            "created_at": (
+                order.get("created_at").isoformat()
+                if isinstance(order.get("created_at"), datetime)
+                else None
+            ),
+            "updated_at": (
+                order.get("updated_at").isoformat()
+                if isinstance(order.get("updated_at"), datetime)
+                else None
+            ),
         }
 
         return Response({"order": order_detail}, status=200)
 
     except Exception as e:
-        # ⚠️ Log full traceback for server-side debugging
         print(f"Error fetching order detail for ID {order_id}: {e}")
-        return Response({"error": "Failed to fetch order details due to a server error."}, status=500)
+        return Response({"error": "Server error while fetching order details."}, status=500)
+
+
+
 
 
 
@@ -5013,6 +5038,20 @@ def admin_sales_volume(request):
         }, status=500)
 
 
+from bson import ObjectId
+
+
+def clean_mongo_doc(doc):
+    """Recursively converts ObjectIds and datetimes into JSON-friendly types."""
+    if isinstance(doc, list):
+        return [clean_mongo_doc(x) for x in doc]
+    if isinstance(doc, dict):
+        return {k: clean_mongo_doc(v) for k, v in doc.items()}
+    if isinstance(doc, ObjectId):
+        return str(doc)
+    if isinstance(doc, datetime):
+        return doc.isoformat()
+    return doc
 
 
 
@@ -5035,13 +5074,12 @@ def admin_get_all_orders_details(request):
         orders = []
 
         for order in orders_cursor:
-            # Convert ObjectId and datetime to string for JSON serialization
             orders.append({
                 "_id": str(order.get("_id")),
-                "customer_id": str(order.get("customer_id")),
+                "customer_id": str(order.get("customer_id")) if order.get("customer_id") else None,
                 "customer_name": order.get("customer_name"),
                 "customer_phone": order.get("customer_phone"),
-                "product_id": str(order.get("product_id")),
+                "product_id": str(order.get("product_id")) if order.get("product_id") else None,
                 "product_name": order.get("product_name"),
                 "quantity": order.get("quantity"),
                 "weight": float(order.get("weight", 0)),
@@ -5056,17 +5094,25 @@ def admin_get_all_orders_details(request):
                 "delivery_surcharge": float(order.get("delivery_surcharge", 0)),
                 "created_at": order.get("created_at").isoformat() if order.get("created_at") else None,
                 "updated_at": order.get("updated_at").isoformat() if order.get("updated_at") else None,
-                "assigned_driver_id": order.get("assigned_driver_id"),
+                # 🧠 Convert ObjectId safely:
+                "assigned_driver_id": str(order.get("assigned_driver_id")) if order.get("assigned_driver_id") else None,
                 "delivered_at": order.get("delivered_at").isoformat() if order.get("delivered_at") else None,
             })
 
         return Response({"orders": orders}, status=200)
 
     except Exception as e:
+        print(f"🔥 Error fetching admin order details: {e}")
         return Response(
             {"error": "Failed to fetch orders details", "details": str(e)},
             status=500
         )
+
+
+
+
+
+
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
