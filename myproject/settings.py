@@ -121,6 +121,8 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
     "x-admin-pin",
+    "x-driver-pin",
+    "x-driver-email",
 ]
 CORS_ALLOW_CREDENTIALS = True
 

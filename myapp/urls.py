@@ -114,9 +114,9 @@ urlpatterns = [
         # --- Driver Order Actions ---
     path('api/v1/driver/orders/<str:order_id>/confirm/', confirm_order, name='driver_order_confirm'),
     path('api/v1/driver/orders/<str:order_id>/cancel/', cancel_order, name='driver_order_cancel'), # Reusing user cancel logic
-    path('api/v1/driver/orders/<str:order_id>/delivered/', mark_delivered, name='driver_order_mark_delivered'),
-   
-   
+    path('api/v1/driver/orders/<str:order_id>/deliver/', mark_delivered, name='driver_order_mark_delivered'),
+
+
    
    
     path('api/v1/driver/<str:driver_id>/performance/', driver_performance_metrics, name='driver-performance'),

@@ -137,3 +137,34 @@ def serialize_objectid(doc):
         return str(doc)
     else:
         return doc
+
+
+
+
+
+
+import bcrypt
+from rest_framework.response import Response
+from bson import ObjectId
+
+def verify_driver_pin(request):
+    """
+    Custom auth using driver email + pin.
+    The frontend should send:
+    headers = { "X-Driver-Email": email, "X-Driver-PIN": pin }
+    """
+    email = request.headers.get("X-Driver-Email")
+    pin = request.headers.get("X-Driver-PIN")
+
+    if not email or not pin:
+        return None, Response({"error": "Missing driver credentials."}, status=401)
+
+    driver = drivers_collection.find_one({"email": email})
+    if not driver:
+        return None, Response({"error": "Driver not found."}, status=404)
+
+    stored_hash = driver.get("pin")
+    if not stored_hash or not bcrypt.checkpw(pin.encode(), stored_hash.encode()):
+        return None, Response({"error": "Invalid PIN."}, status=403)
+
+    return driver, None
